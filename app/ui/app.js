@@ -74,7 +74,7 @@
       const done = v => { $("#modal").hidden = true; $("#modalForm").onsubmit = null; resolve(v); };
       $("#modalForm").onsubmit = e => {
         e.preventDefault();
-        done(Object.fromEntries($$("#modalBody [name]").map(i => [i.name, i.value])));
+        done(Object.fromEntries($$("#modalBody [name]").map(i => [i.name, i.type === "checkbox" ? i.checked : i.value])));
       };
       $("#modalCancel").onclick = () => done(null);
     });
@@ -117,6 +117,7 @@
         <div class="sub">${!p.total ? "No script yet" : p.done >= p.total ? fmtDur(p.audio) + " · done"
           : (w.running && w.current?.project === p.id ? "Generating · " : "") + `${p.done}/${p.total} paragraphs`}</div></div>
       </button>`).join("") || '<div class="small muted" style="padding:8px">No projects yet.</div>';
+    if (S.cog) renderCog();
     $("#voiceCount").textContent = o.voices.length;
     $("#pronCount").textContent = o.pronunciations;
     const busy = w.running || o.writer?.state === "running";
@@ -655,6 +656,75 @@
     $$("[data-reveal]").forEach(b => b.onclick = attempt(() => api("POST", "/api/reveal", { path: p.exports[+b.dataset.reveal].path })));
   }
 
+  /* ---------- the Cogitator (Scriptorium scripts from ~/study) ---------- */
+  const COG_TAG = { writing: "writing…", ready: "new", incomplete: "incomplete" };
+  function cogStatus(it) {
+    if (it.state === "writing") {
+      const j = S.cog.job;
+      return `<span class="tag tag-writing">writing${j?.total ? ` ${j.done}/${j.total}` : "…"}</span>`;
+    }
+    if (it.project) return it.changed ? '<span class="tag tag-updated">updated · re-import</span>' : '<span class="tag tag-imported">imported</span>';
+    return `<span class="tag tag-${it.state === "ready" ? "new" : "incomplete"}">${COG_TAG[it.state]}</span>`;
+  }
+  function renderCog() {
+    const c = S.cog, show = c?.available && c.items.length;
+    $("#cogLabel").hidden = $("#cogList").hidden = !show;
+    if (!show) return;
+    $("#cogList").innerHTML = c.items.map((it, i) => `
+      <button class="proj-item cog-item ${it.project && it.project === S.pid ? "active" : ""}" data-cog="${i}" title="${esc(it.name)}">
+        <span class="cog-ic">${esc((it.voice || "?")[0])}</span>
+        <div><div class="name">${esc(it.subject)} · ${esc(it.label)}</div>
+        <div class="sub">${esc(it.voice)} · ${cogStatus(it)}</div></div>
+      </button>`).join("");
+    $$("[data-cog]").forEach(b => b.onclick = () => cogClick(c.items[+b.dataset.cog]));
+  }
+  async function loadCog() {
+    const before = S.cog?.items.filter(i => i.project).length;
+    S.cog = await api("GET", "/api/cogitator").catch(() => null);
+    renderCog();
+    if (S.cog && before !== undefined && S.cog.items.filter(i => i.project).length !== before) await refreshOverview();
+  }
+  const cogClick = attempt(async it => {
+    if (it.project && !it.changed) return selectProject(it.project);
+    if (it.state === "writing") return toast("The Cogitator is still writing this one. It'll be ready to import when it's done.");
+    const vs = S.overview.voices;
+    if (!vs.length) { toast("Add a voice first."); return go("voice"); }
+    const proj = it.project && S.overview.projects.find(p => p.id === it.project);
+    const pick = proj?.voice || S.cog.settings.voice_map[it.voice] || vs[0].id;
+    const r = await modal(it.project ? "Update from the Cogitator" : "Import from the Cogitator", `
+      <div><b>${esc(it.subject)} · ${esc(it.label)}</b><div class="small muted">${esc(it.voice)} · ${it.words.toLocaleString()} words · about ${fmtDur(it.words / 150 * 60)} of audio</div></div>
+      ${it.state === "incomplete" ? '<div class="err">This script looks unfinished (it has no sign-off). The Scriptorium may have stopped partway.</div>' : ""}
+      ${it.project ? '<div class="small muted">The script changed since you imported it. Updating keeps the audio of every paragraph that stayed the same.</div>' : ""}
+      <div><label class="label">Voice</label><select name="voice">${vs.map(v => `<option value="${v.id}" ${v.id === pick ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></div>
+      <label class="toggle"><input type="checkbox" name="generate"><span class="sw"></span><span><span class="t">Start generating right away</span><br>
+        <span class="d">About ${fmtDur(it.words / 150 * 60 * (worker().ratio || 6.5))} on this Mac.</span></span></label>`, it.project ? "Update" : "Import");
+    if (!r) return;
+    const p = await api("POST", "/api/cogitator/import", { name: it.name, voice: r.voice, generate: r.generate });
+    await loadCog(); await loadOverview(); await selectProject(p.id); go(r.generate ? "generate" : "script");
+    if (r.generate) poll();
+    toast(r.generate ? "Imported. Generating now." : "Imported. Check the script and pronunciations, then generate.");
+  });
+  $("#cogSettings").onclick = attempt(async () => {
+    const s = S.cog.settings, vs = S.overview.voices;
+    const personas = [...new Set([...S.cog.items.map(i => i.voice).filter(Boolean), ...Object.keys(s.voice_map)])];
+    const r = await modal("The Cogitator", `
+      <div class="small muted">Scripts come from <b>${esc(S.cog.folder.replace(/^\/Users\/[^/]+/, "~"))}</b>, written by the Scriptorium. F5 Studio only reads that folder.</div>
+      <label class="toggle"><input type="checkbox" name="auto_import" ${s.auto_import ? "checked" : ""}><span class="sw"></span><span><span class="t">Import finished scripts automatically</span><br>
+        <span class="d">New scripts become projects, and updated ones refresh their project.</span></span></label>
+      <label class="toggle"><input type="checkbox" name="auto_generate" ${s.auto_generate ? "checked" : ""}><span class="sw"></span><span><span class="t">Then start generating</span><br>
+        <span class="d">Queued behind whatever is already generating.</span></span></label>
+      ${personas.length ? `<div><label class="label">Which F5 voice reads each character</label><div class="stack" style="gap:8px">
+        ${personas.map(n => `<div class="map-row"><span>${esc(n)}</span><select name="map:${esc(n)}">
+          <option value="">First voice (${esc(vs[0]?.name || "none")})</option>
+          ${vs.map(v => `<option value="${v.id}" ${s.voice_map[n] === v.id ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></div>`).join("")}
+      </div></div>` : ""}`, "Save");
+    if (!r) return;
+    const voice_map = {};
+    Object.entries(r).forEach(([k, v]) => { if (k.startsWith("map:") && v) voice_map[k.slice(4)] = v; });
+    S.cog.settings = await api("PUT", "/api/cogitator/settings", { auto_import: r.auto_import, auto_generate: r.auto_generate, voice_map });
+    toast(r.auto_import ? "Saved. Finished scripts will import on their own." : "Saved.");
+  });
+
   /* ---------- routing, polling ---------- */
   const views = { script: renderScript, pron: () => renderPron(), voice: renderVoice, generate: () => renderGenerate(), export: renderExport };
   function go(step) {
@@ -731,5 +801,6 @@
     catch (e) { document.body.innerHTML = `<div class="empty"><b>Can't reach the F5 Studio server</b>${esc(e.message)}</div>`; return; }
     renderSidebar(); go(S.step);
     if (worker().running || S.overview.writer?.state === "running") poll();
+    loadCog(); setInterval(loadCog, 10000);
   })();
 })();

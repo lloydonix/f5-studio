@@ -11,7 +11,7 @@ from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import engine, export, store, textprep, voices, writer
+from . import engine, export, inbox, store, textprep, voices, writer
 
 UI = Path(__file__).resolve().parent.parent / "ui"
 app = FastAPI(title="F5 Studio", docs_url=None, redoc_url=None)
@@ -230,6 +230,30 @@ def write_script(pid: str, model: str = Body(..., embed=True)):
     except (ValueError, RuntimeError) as e:
         bad(str(e))
     return writer.JOB
+
+
+# ---------- the Cogitator (scripts from ~/study's Scriptorium) ----------
+
+@app.get("/api/cogitator")
+def cogitator():
+    return {**inbox.scan(), "settings": inbox.settings()}
+
+
+@app.put("/api/cogitator/settings")
+def cogitator_settings(body: dict = Body(...)):
+    return inbox.save_settings(body)
+
+
+@app.post("/api/cogitator/import")
+def cogitator_import(name: str = Body(...), voice: str = Body(""), generate: bool = Body(False)):
+    if voice:
+        voice_or_404(voice)
+    try:
+        return inbox.import_script(name, voice or None, generate)
+    except FileNotFoundError:
+        bad("That script isn't in the Cogitator's folder anymore.", 404)
+    except ValueError as e:
+        bad(str(e))
 
 
 # ---------- files ----------

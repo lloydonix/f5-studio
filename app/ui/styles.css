@@ -87,6 +87,19 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .ring .fg { stroke: var(--accent); stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; }
 .ring.complete .fg { stroke: var(--ok); }
 .lib-item { color: var(--muted); font-size: 13px; }
+.side-label-row { display: flex; align-items: center; justify-content: space-between; margin-right: 0; }
+.side-label-row[hidden], .project-list[hidden] { display: none; }
+.icon-btn-sm { width: 24px; height: 24px; }
+.icon-btn-sm svg { width: 14px; height: 14px; }
+.cog-item .cog-ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none;
+  background: var(--panel-2); color: var(--muted); font-size: 13px; font-weight: 700; }
+.cog-item .sub .tag { font-weight: 600; }
+.tag-writing { color: var(--busy); }
+.tag-new { color: var(--accent); }
+.tag-updated { color: var(--warn); }
+.tag-incomplete { color: var(--faint); }
+.tag-imported { color: var(--ok); }
+.map-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; }
 .lib-item .count { margin-left: auto; font-size: 11.5px; color: var(--faint); }
 .engine { margin-top: auto; display: flex; gap: 10px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
 .engine-title { font-size: 12.5px; font-weight: 600; }
