@@ -22,11 +22,11 @@
 
   const S = {
     overview: null, project: null, prons: null, models: null,
-    pid: localStorage.getItem("pid"), step: localStorage.getItem("step") || "generate",
+    pid: null, step: "generate",
     filter: "all", playing: null, scriptDirty: false, sourceDirty: false,
     exportOpts: { format: "mp3", quality: "high", name: "" },
   };
-  try { S.pid = localStorage.getItem("pid"); } catch { }
+  try { S.pid = localStorage.getItem("pid"); S.step = localStorage.getItem("step") || "generate"; } catch { }
 
   /* ---------- helpers ---------- */
   async function api(method, path, body) {
@@ -120,10 +120,9 @@
     if (S.cog) renderCog();
     $("#voiceCount").textContent = o.voices.length;
     $("#pronCount").textContent = o.pronunciations;
-    const busy = w.running || o.writer?.state === "running";
+    const busy = w.running;
     $(".engine .dot").className = "dot " + (w.error ? "dot-warn" : busy ? "dot-busy" : "dot-ok");
     $(".engine-sub").textContent = w.error ? "Stopped with an error"
-      : o.writer?.state === "running" ? `Writing a script with ${o.writer.model}`
       : w.running ? (w.engine === "loading" ? "Loading the voice model…" : `Generating ${titleOf(w.current?.project)}`)
       : "Offline · idle";
   }
@@ -161,9 +160,28 @@
       ${row(c.headings_script >= c.headings_source, `${c.headings_script} of ${c.headings_source} headings`)}
     </ul>`;
   }
+  function cogPickerHTML(p) {
+    const c = S.cog;
+    if (!c) return '<p class="small muted" style="margin:14px 0 0">Looking for the Cogitator…</p>';
+    if (!c.available) return `<p class="small muted" style="margin:14px 0 0">The Cogitator's scripts folder (~/study/scripts) isn't there yet.</p>`;
+    const linked = p.origin?.cogitator, li = c.items.find(i => i.name === linked);
+    const ready = c.items.filter(i => i.state !== "writing");
+    return `
+      ${linked ? `<div class="row" style="margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--panel-2)">
+        <span class="small"><b>Linked to</b> ${esc(linked.replace(/\.txt$/, ""))}${li ? ` · ${li.changed ? '<span class="tag tag-updated">updated in the Cogitator</span>' : '<span class="tag tag-imported">up to date</span>'}` : ' · <span class="tag tag-incomplete">no longer in the folder</span>'}</span>
+        <span class="spacer"></span>${li?.changed ? `<button class="btn btn-primary" data-cogpull="${esc(linked)}">${I.redo}Update</button>` : ""}</div>` : ""}
+      <div class="row" style="margin-top:14px;flex-wrap:nowrap">
+        <select id="cogSel" style="flex:1" ${ready.length ? "" : "disabled"}>${ready.length ? ready.map(i => `<option value="${esc(i.name)}" ${i.name === linked ? "selected" : ""}>
+          ${esc(i.subject)} · ${esc(i.label)} (${esc(i.voice)}, ${i.words.toLocaleString()} words${i.state === "incomplete" ? ", unfinished" : ""})</option>`).join("")
+          : "<option>No finished scripts yet</option>"}</select>
+        <button class="btn btn-primary" id="cogUse" ${ready.length ? "" : "disabled"}>Use this script</button>
+      </div>
+      ${c.items.some(i => i.state === "writing") ? `<p class="small muted" style="margin:8px 0 0">${c.items.filter(i => i.state === "writing").map(i => esc(i.subject + " · " + i.label)).join(", ")} is still being written${c.job?.total ? ` (${c.job.done}/${c.job.total})` : ""}.</p>` : ""}
+      <div class="row" style="margin-top:12px"><button class="btn" id="cogOpen">Open the Cogitator</button>
+        <span class="small muted">Write it in the Scriptorium (Workspace → Scriptorium), then pick it above.</span></div>`;
+  }
   function renderScript() {
-    const p = S.project, wr = p.writer, mode = wr.mode || "paste", job = S.overview.writer, est = p.words / 150 * 60;
-    const writing = job.state === "running" && job.project === p.id;
+    const p = S.project, mode = p.writer?.mode === "cogitator" ? "cogitator" : "paste", est = p.words / 150 * 60;
     $("#view-script").innerHTML = `
       <div class="grid-side">
         <div class="stack">
@@ -173,20 +191,12 @@
             <div class="card-pad">
               <div class="seg" id="writerSeg">
                 <button data-mode="paste" class="${mode === "paste" ? "on" : ""}">Paste from Claude</button>
-                <button data-mode="ollama" class="${mode === "ollama" ? "on" : ""}">Local Ollama</button>
+                <button data-mode="cogitator" class="${mode === "cogitator" ? "on" : ""}">The Cogitator</button>
               </div>
               <p class="small muted" style="margin:12px 0 0">${mode === "paste"
                 ? "Ask Claude for the script in chat, then paste it below. Best quality, and free with your Claude plan."
-                : "Free and private: a model on this Mac rewrites your source notes section by section. Weaker at keeping the law exact, so check the fact check after."}</p>
-              ${mode === "ollama" ? `
-                <div class="row" style="margin-top:14px;flex-wrap:nowrap">
-                  <select id="modelSel" style="flex:1">${S.models === null ? "<option>Checking Ollama…</option>"
-                    : !S.models.running ? "<option>Ollama isn't running. Open the Ollama app.</option>"
-                    : S.models.models.map(m => `<option ${m === wr.model ? "selected" : ""}>${esc(m)}</option>`).join("")}</select>
-                  <button class="btn btn-primary" id="writeBtn" ${writing || !S.models?.running ? "disabled" : ""}>${I.spark}${writing ? `Writing ${job.done}/${job.total}…` : "Write script from notes"}</button>
-                </div>
-                ${job.state === "error" && job.project === p.id ? `<div class="err" style="margin-top:10px">${esc(job.error)}</div>` : ""}
-                <p class="small muted" style="margin:10px 0 0">Writing replaces the script below. It takes a few minutes per section, and audio generation has to wait until it's done.</p>` : ""}
+                : "The Cogitator's Scriptorium writes it from your reviewer and the notes it links to, in the character you choose. Pick a finished script to put it in this project. If it's rewritten later, this project shows it as updated."}</p>
+              ${mode === "cogitator" ? `<div id="cogPicker">${cogPickerHTML(p)}</div>` : ""}
             </div>
           </div>
 
@@ -202,7 +212,7 @@
 
           <div class="card">
             <div class="card-head">
-              <div><div class="card-title">Source notes</div><div class="card-sub">Your original reviewer. Used for the fact check${mode === "ollama" ? " and by the writer" : ""}.</div></div>
+              <div><div class="card-title">Source notes</div><div class="card-sub">Your original reviewer, for the fact check.</div></div>
               <div class="row"><span class="saved-note" id="sourceNote">Saved</span><button class="btn" id="saveSource">${I.save}Save</button></div>
             </div>
             <div class="card-pad"><textarea id="sourceBox" rows="8" spellcheck="false" placeholder="Paste the original notes here.">${esc(p.source)}</textarea></div>
@@ -214,17 +224,6 @@
             <div class="card-title" style="margin-bottom:12px">Persona</div>
             <label class="label">Name shown on the project</label>
             <input type="text" id="personaName" value="${esc(p.persona)}" placeholder="e.g. Shadowheart (dom)">
-            <label class="label" style="margin-top:14px">Character, for the Ollama writer</label>
-            <input type="text" id="wrChar" value="${esc(wr.character || "Shadowheart")}">
-            <label class="label" style="margin-top:14px">Tone</label>
-            <div class="seg" id="toneSeg">${["Gentle", "Firm", "Dom"].map(t => `<button data-tone="${t}" class="${wr.tone === t ? "on" : ""}">${t}</button>`).join("")}</div>
-            <div style="margin-top:12px">
-              ${[["keep_law", "Keep the law exact", "Only the character's lines change, never the content."],
-                 ["lore", "In-lore references", "Companions, faith, the world she's from."],
-                 ["labels", "Turn study labels into speech", '"Medium." and "Low, one line each" become transitions.']].map(([k, t, d]) => `
-                <label class="toggle"><input type="checkbox" data-wr="${k}" ${wr[k] !== false ? "checked" : ""}><span class="sw"></span>
-                <span><span class="t">${t}</span><br><span class="d">${d}</span></span></label>`).join("")}
-            </div>
           </div>
           <div class="card card-pad"><div class="card-title" style="margin-bottom:10px">Fact check against source</div><div id="checkBox">${checkHTML(p.check)}</div></div>
           <div class="card card-pad">
@@ -243,14 +242,31 @@
     $("#saveScript").onclick = attempt(saveScript);
     $("#saveSource").onclick = attempt(saveSource);
     $("#openTxt").onclick = () => $("#pickScript").click();
-    $$("#writerSeg button").forEach(b => b.onclick = attempt(async () => { await saveWriter({ mode: b.dataset.mode }); if (b.dataset.mode === "ollama") loadModels(); }));
-    $$("#toneSeg button").forEach(b => b.onclick = attempt(() => saveWriter({ tone: b.dataset.tone })));
-    $$("[data-wr]").forEach(c => c.onchange = attempt(() => saveWriter({ [c.dataset.wr]: c.checked })));
-    $("#wrChar").onchange = attempt(e => saveWriter({ character: e.target.value }));
+    $$("#writerSeg button").forEach(b => b.onclick = attempt(async () => {
+      if (S.scriptDirty || S.sourceDirty) return toast("Save your text first.");
+      p.writer = { ...p.writer, mode: b.dataset.mode };
+      await api("PUT", `/api/projects/${p.id}/settings`, { writer: p.writer });
+      if (b.dataset.mode === "cogitator") await loadCog();
+      renderScript();
+    }));
     $("#personaName").onchange = attempt(async e => { await api("PUT", `/api/projects/${p.id}/settings`, { persona: e.target.value }); p.persona = e.target.value; renderHeader(); });
-    const ms = $("#modelSel"); if (ms) ms.onchange = attempt(() => saveWriter({ model: ms.value }));
-    const wb = $("#writeBtn"); if (wb) wb.onclick = attempt(writeScript);
-    if (mode === "ollama" && S.models === null) loadModels();
+    bindCogPicker();
+  }
+  function bindCogPicker() {
+    const use = $("#cogUse");
+    if (use) use.onclick = attempt(() => useCogScript($("#cogSel").value));
+    $$("[data-cogpull]").forEach(b => b.onclick = attempt(() => useCogScript(b.dataset.cogpull)));
+    const op = $("#cogOpen");
+    if (op) op.onclick = attempt(() => api("POST", "/api/cogitator/open"));
+  }
+  async function useCogScript(name) {
+    if (S.scriptDirty || S.sourceDirty) return toast("Save your text first.");
+    const p = S.project, it = S.cog.items.find(i => i.name === name);
+    if (p.script.trim() && p.origin?.cogitator !== name &&
+        !confirm(`Replace this project's script with "${it ? it.subject + " · " + it.label : name}"? Paragraphs that stay the same keep their audio.`)) return;
+    await api("POST", "/api/cogitator/import", { name, project: p.id });
+    await loadProject(); await refreshOverview(); await loadCog(); renderScript();
+    toast(`Script loaded: ${S.project.total} paragraphs, ${S.project.done} already have audio.`);
   }
   async function saveScript() {
     S.project = await api("PUT", `/api/projects/${S.pid}/script`, { script: $("#scriptBox").value });
@@ -264,25 +280,6 @@
     S.project.source = $("#sourceBox").value; S.project.check = r.check; S.sourceDirty = false;
     $("#sourceNote").textContent = "Saved"; $("#sourceNote").classList.remove("dirty");
     $("#checkBox").innerHTML = checkHTML(r.check);
-  }
-  async function saveWriter(change) {
-    if (S.scriptDirty || S.sourceDirty) toast("Save your text first.");
-    S.project.writer = { ...S.project.writer, ...change };
-    await api("PUT", `/api/projects/${S.pid}/settings`, { writer: S.project.writer });
-    if (!S.scriptDirty && !S.sourceDirty) renderScript();
-  }
-  async function loadModels() {
-    S.models = await api("GET", "/api/writer/models").catch(() => ({ running: false, models: [] }));
-    if (S.models.running && !S.project.writer.model && S.models.models[0]) S.project.writer.model = S.models.models[0];
-    if (S.step === "script" && !S.scriptDirty && !S.sourceDirty) renderScript();
-  }
-  async function writeScript() {
-    if (S.sourceDirty) await saveSource();
-    if (!S.project.source.trim()) return toast("Paste your notes under Source notes first.");
-    if (S.project.script.trim() && !confirm("This replaces the current script. Continue?")) return;
-    await api("POST", `/api/projects/${S.pid}/write`, { model: $("#modelSel").value });
-    await refreshOverview(); renderScript(); poll();
-    toast("Writing started. You can leave this tab; it keeps going.");
   }
   $("#pickScript").onchange = e => {
     const f = e.target.files[0]; if (!f) return;
@@ -682,6 +679,8 @@
     const before = S.cog?.items.filter(i => i.project).length;
     S.cog = await api("GET", "/api/cogitator").catch(() => null);
     renderCog();
+    const pk = $("#cogPicker");
+    if (pk && S.step === "script" && S.project && !S.scriptDirty && !S.sourceDirty) { pk.innerHTML = cogPickerHTML(S.project); bindCogPicker(); }
     if (S.cog && before !== undefined && S.cog.items.filter(i => i.project).length !== before) await refreshOverview();
   }
   const cogClick = attempt(async it => {
@@ -746,7 +745,7 @@
   async function reloadAll() { await loadOverview(); await loadProject(); renderSidebar(); go(S.step); }
   async function selectProject(pid) {
     if (S.step === "script" && (S.scriptDirty || S.sourceDirty) && !confirm("You have unsaved text. Leave without saving?")) return;
-    player.pause(); S.playing = null; S.pid = pid; save("pid", pid); S.models = null;
+    player.pause(); S.playing = null; S.pid = pid; save("pid", pid);
     await loadProject(); renderSidebar(); go(S.step);
   }
 
@@ -756,17 +755,16 @@
     pollTimer = setTimeout(async () => {
       try {
         const st = await api("GET", "/api/status");
-        const was = S.overview.worker.running || S.overview.writer?.state === "running";
-        S.overview.worker = st.worker; S.overview.writer = st.writer;
+        const was = S.overview.worker.running;
+        S.overview.worker = st.worker;
         if (st.project) { const i = S.overview.projects.findIndex(p => p.id === st.project.id); if (i >= 0) S.overview.projects[i] = st.project; }
         renderSidebar(); renderHeader();
         const cur = st.worker.current ? `${st.worker.current.project}:${st.worker.current.si}:${st.worker.current.pi}` : null;
-        const busy = st.worker.running || st.writer?.state === "running";
+        const busy = st.worker.running;
         if (S.project && (cur !== lastCur || (st.project && st.project.id === S.pid && st.project.done !== lastDone) || (was && !busy))) {
           lastCur = cur; lastDone = st.project?.done;
           if (S.step === "generate" || S.step === "export") await reloadProject(true);
-          if (S.step === "script" && st.writer?.project === S.pid && !S.scriptDirty && !S.sourceDirty) { await loadProject(); renderScript(); }
-          if (was && !busy) { await refreshOverview(); if (st.writer?.state === "done" && st.writer.project === S.pid) toast("The script is written. Check the fact check."); }
+          if (was && !busy) await refreshOverview();
         }
         if (busy) poll();
       } catch { poll(); }
@@ -800,7 +798,7 @@
     try { await loadOverview(); await loadProject(); }
     catch (e) { document.body.innerHTML = `<div class="empty"><b>Can't reach the F5 Studio server</b>${esc(e.message)}</div>`; return; }
     renderSidebar(); go(S.step);
-    if (worker().running || S.overview.writer?.state === "running") poll();
+    if (worker().running) poll();
     loadCog(); setInterval(loadCog, 10000);
   })();
 })();

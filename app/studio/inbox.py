@@ -98,15 +98,26 @@ def scan():
             "job": job and {k: job.get(k) for k in ("state", "done", "total", "files")}}
 
 
-def import_script(name, voice_id=None, generate=False):
-    """Create a project from a Cogitator script, or update the one made from it before."""
+def open_cogitator():
+    """Bring up The Cogitator app (its Scriptorium is in Open WebUI's sidebar there)."""
+    import subprocess
+    r = subprocess.run(["/usr/bin/open", "-b", "com.lloyd.study"], capture_output=True)
+    if r.returncode:
+        subprocess.run(["/usr/bin/open", "http://127.0.0.1:8779/scriptorium"])
+
+
+def import_script(name, voice_id=None, generate=False, project_id=None):
+    """Create a project from a Cogitator script, or update the one made from it before.
+    With project_id, the script goes into that project instead (and links it to the file)."""
     f = SCRIPTS / Path(name).name
     if not f.is_file():
         raise FileNotFoundError(name)
     m = NAME.match(f.name)
     persona = m["voice"] if m else ""
     with _lock:
-        proj, _ = _imported().get(f.name, (None, 0))
+        proj = store.Project(project_id) if project_id else _imported().get(f.name, (None, 0))[0]
+        if project_id and persona and not proj.meta.get("persona"):
+            proj.save_meta(persona=persona)
         if not proj:
             vmap = settings()["voice_map"]
             voice_id = voice_id or vmap.get(persona) or (store.voices()[0]["id"] if store.voices() else None)

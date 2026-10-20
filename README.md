@@ -8,8 +8,9 @@ Write or paste a script, fix pronunciations, pick a 5–10 second reference voic
 generates it one paragraph at a time on the Apple GPU, with pause and resume, redoing single lines,
 and a merged MP3 in Downloads at the end.
 
-- **Script**: paste one in, or have a local [Ollama](https://ollama.com) model write it from your
-  notes. A fact check flags numbers or citations that went missing compared to the source.
+- **Script**: paste one in (e.g. written with Claude), or pick one written by the Cogitator's
+  Scriptorium (a separate local study app; see app/README.md). A fact check flags numbers or citations
+  that went missing compared to the source.
 - **Pronunciation**: a shared find-and-replace list (Latin terms, names, acronyms), plus numbers
   turned into words, before anything is spoken.
 - **Voice**: drop in a clip; it's trimmed, converted to 24 kHz and transcribed with Whisper.

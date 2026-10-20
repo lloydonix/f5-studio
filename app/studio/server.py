@@ -11,7 +11,7 @@ from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import engine, export, inbox, store, textprep, voices, writer
+from . import engine, export, inbox, store, textprep, voices
 
 UI = Path(__file__).resolve().parent.parent / "ui"
 app = FastAPI(title="F5 Studio", docs_url=None, redoc_url=None)
@@ -44,7 +44,6 @@ def state():
         "voices": store.voices(),
         "pronunciations": len(store.pronunciations()),
         "worker": engine.WORKER.state(),
-        "writer": writer.JOB,
     }
 
 
@@ -52,7 +51,7 @@ def state():
 def status():
     """Cheap poll while generating: worker state plus the active project's counts."""
     w = engine.WORKER.state()
-    out = {"worker": w, "writer": writer.JOB}
+    out = {"worker": w}
     if w["current"]:
         out["project"] = store.Project(w["current"]["project"]).summary()
     return out
@@ -75,7 +74,7 @@ def get_project(pid: str):
     m = p.meta
     return {
         **p.summary(sections), "script": p.script, "source": p.source, "sections": sections,
-        "pacing": m["pacing"], "quality": m["quality"], "writer": m["writer"], "exports": p.exports(),
+        "pacing": m["pacing"], "quality": m["quality"], "writer": m["writer"], "origin": m.get("origin"), "exports": p.exports(),
         "check": textprep.fact_check(p.source, p.script) if p.source.strip() else None,
     }
 
@@ -117,8 +116,6 @@ def regen(pid: str, key: str = Body(..., embed=True)):
 @app.post("/api/generate/{pid}/start")
 def gen_start(pid: str):
     project_or_404(pid)
-    if writer.JOB.get("state") == "running":
-        bad("A script is being written with Ollama. Wait for it to finish first.", 409)
     engine.WORKER.start(pid)
     return engine.WORKER.state()
 
@@ -212,31 +209,17 @@ def retranscribe(vid: str):
     return store.save_voice(v)
 
 
-# ---------- script writer (Ollama) ----------
-
-@app.get("/api/writer/models")
-def writer_models():
-    m = writer.models()
-    return {"running": m is not None, "models": m or []}
-
-
-@app.post("/api/projects/{pid}/write")
-def write_script(pid: str, model: str = Body(..., embed=True)):
-    p = project_or_404(pid)
-    if engine.WORKER.state()["running"]:
-        bad("Pause audio generation first. Both together don't fit in memory.", 409)
-    try:
-        writer.start(p, model, p.meta["writer"])
-    except (ValueError, RuntimeError) as e:
-        bad(str(e))
-    return writer.JOB
-
-
 # ---------- the Cogitator (scripts from ~/study's Scriptorium) ----------
 
 @app.get("/api/cogitator")
 def cogitator():
     return {**inbox.scan(), "settings": inbox.settings()}
+
+
+@app.post("/api/cogitator/open")
+def cogitator_open():
+    inbox.open_cogitator()
+    return {"ok": True}
 
 
 @app.put("/api/cogitator/settings")
@@ -245,11 +228,14 @@ def cogitator_settings(body: dict = Body(...)):
 
 
 @app.post("/api/cogitator/import")
-def cogitator_import(name: str = Body(...), voice: str = Body(""), generate: bool = Body(False)):
+def cogitator_import(name: str = Body(...), voice: str = Body(""), generate: bool = Body(False),
+                     project: str = Body("")):
     if voice:
         voice_or_404(voice)
+    if project:
+        project_or_404(project)
     try:
-        return inbox.import_script(name, voice or None, generate)
+        return inbox.import_script(name, voice or None, generate, project or None)
     except FileNotFoundError:
         bad("That script isn't in the Cogitator's folder anymore.", 404)
     except ValueError as e:

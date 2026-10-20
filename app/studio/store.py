@@ -1,6 +1,6 @@
 """Projects, voices and the pronunciation list, all stored as plain files under ~/f5-tts.
 
-projects/<id>/project.json   title, voice, persona, pacing, writer settings
+projects/<id>/project.json   title, voice, persona, pacing, where the script comes from
 projects/<id>/script.txt     the script as written
 projects/<id>/source.txt     optional source notes, for the fact check
 projects/<id>/clips/         one WAV per paragraph; index.json maps clip key -> file
@@ -107,8 +107,7 @@ class Project:
         m = _read(self.dir / "project.json", {})
         m.setdefault("pacing", dict(DEFAULT_PACING))
         m.setdefault("quality", "best")
-        m.setdefault("writer", {"mode": "paste", "model": "", "tone": "Dom", "character": "Shadowheart",
-                                "keep_law": True, "lore": True, "labels": True})
+        m.setdefault("writer", {"mode": "paste"})   # paste | cogitator
         return m
 
     def save_meta(self, **changes):
