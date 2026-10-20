@@ -1,0 +1,18 @@
+# Only the app code is tracked. Everything else in this folder is personal data
+# (voices, generated audio, scripts) or local environment, and stays off GitHub.
+/*
+!/.gitignore
+!/README.md
+!/app/
+!/launcher/
+
+# never commit, even inside tracked folders
+app/tools/
+app/server.log
+app/desktop/*.app
+app/desktop/build/
+__pycache__/
+*.pyc
+*.wav
+*.mp3
+.DS_Store

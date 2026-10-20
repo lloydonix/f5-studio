@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>F5 Studio</title>
+  <link rel="icon" href="icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="icon.png" alt="">
+        <div>
+          <div class="brand-name">F5 Studio</div>
+          <div class="brand-sub">Local voice studio</div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-block" id="newProject">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
+        New project
+      </button>
+
+      <div class="side-label">Projects</div>
+      <nav class="project-list" id="projectList"></nav>
+
+      <div class="side-label">Library</div>
+      <nav class="lib-list">
+        <button class="lib-item" data-goto="voice">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v14M6 6v8M14 6v8M2 9v2M18 9v2"/></svg>
+          Voices <span class="count" id="voiceCount"></span>
+        </button>
+        <button class="lib-item" data-goto="pron">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h8M4 15h10"/></svg>
+          Pronunciations <span class="count" id="pronCount"></span>
+        </button>
+      </nav>
+
+      <div class="engine">
+        <span class="dot dot-ok"></span>
+        <div>
+          <div class="engine-title">F5-TTS v1 · Apple GPU</div>
+          <div class="engine-sub">Offline · 16 GB · idle</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="proj-header">
+        <div class="proj-title-row">
+          <h1 id="projTitle"></h1>
+          <span class="chip" id="projState"></span>
+        </div>
+        <div class="proj-meta" id="projMeta"></div>
+      </header>
+
+      <nav class="steps" id="steps" role="tablist">
+        <button class="step" data-step="script" role="tab"><span class="step-n">1</span>Script</button>
+        <button class="step" data-step="pron" role="tab"><span class="step-n">2</span>Pronunciation</button>
+        <button class="step" data-step="voice" role="tab"><span class="step-n">3</span>Voice</button>
+        <button class="step" data-step="generate" role="tab"><span class="step-n">4</span>Generate</button>
+        <button class="step" data-step="export" role="tab"><span class="step-n">5</span>Export</button>
+      </nav>
+
+      <section class="view" id="view-script"></section>
+      <section class="view" id="view-pron"></section>
+      <section class="view" id="view-voice"></section>
+      <section class="view" id="view-generate"></section>
+      <section class="view" id="view-export"></section>
+    </main>
+  </div>
+
+  <div class="modal-back" id="modal" hidden>
+    <form class="modal card" id="modalForm">
+      <div class="card-title" id="modalTitle"></div>
+      <div id="modalBody" class="stack" style="gap:12px;margin:14px 0 18px"></div>
+      <div class="row"><span class="spacer"></span>
+        <button type="button" class="btn" id="modalCancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="modalOk">OK</button></div>
+    </form>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+  <audio id="player" preload="none"></audio>
+  <input type="file" id="pickScript" accept=".txt,.md,text/plain" hidden>
+  <input type="file" id="pickVoice" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg" hidden>
+
+  <script src="app.js"></script>
+</body>
+</html>

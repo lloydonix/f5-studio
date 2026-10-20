@@ -1,0 +1,269 @@
+"""F5 Studio backend: a local-only HTTP API plus the UI, on 127.0.0.1.
+
+Run: ~/f5-tts/.venv/bin/python -m studio.server 8799   (from ~/f5-tts/app; run_server.sh does this)
+"""
+import os, subprocess, sys, tempfile
+from pathlib import Path
+
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
+
+from . import engine, export, store, textprep, voices, writer
+
+UI = Path(__file__).resolve().parent.parent / "ui"
+app = FastAPI(title="F5 Studio", docs_url=None, redoc_url=None)
+
+
+def project_or_404(pid):
+    try:
+        return store.Project(pid)
+    except KeyError:
+        raise HTTPException(404, "No such project")
+
+
+def voice_or_404(vid):
+    try:
+        return store.voice(vid)
+    except KeyError:
+        raise HTTPException(404, "No such voice")
+
+
+def bad(msg, code=400):
+    raise HTTPException(code, msg)
+
+
+# ---------- overview ----------
+
+@app.get("/api/state")
+def state():
+    return {
+        "projects": [p.summary() for p in store.projects()],
+        "voices": store.voices(),
+        "pronunciations": len(store.pronunciations()),
+        "worker": engine.WORKER.state(),
+        "writer": writer.JOB,
+    }
+
+
+@app.get("/api/status")
+def status():
+    """Cheap poll while generating: worker state plus the active project's counts."""
+    w = engine.WORKER.state()
+    out = {"worker": w, "writer": writer.JOB}
+    if w["current"]:
+        out["project"] = store.Project(w["current"]["project"]).summary()
+    return out
+
+
+# ---------- projects ----------
+
+@app.post("/api/projects")
+def create_project(title: str = Body(...), voice: str = Body(...), persona: str = Body("")):
+    if not title.strip():
+        bad("Give the project a name.")
+    voice_or_404(voice)
+    return store.create_project(title.strip(), voice, persona).summary()
+
+
+@app.get("/api/projects/{pid}")
+def get_project(pid: str):
+    p = project_or_404(pid)
+    sections = p.sections()
+    m = p.meta
+    return {
+        **p.summary(sections), "script": p.script, "source": p.source, "sections": sections,
+        "pacing": m["pacing"], "quality": m["quality"], "writer": m["writer"], "exports": p.exports(),
+        "check": textprep.fact_check(p.source, p.script) if p.source.strip() else None,
+    }
+
+
+@app.put("/api/projects/{pid}/script")
+def save_script(pid: str, script: str = Body(..., embed=True)):
+    p = project_or_404(pid)
+    p.save_script(script)
+    return get_project(pid)
+
+
+@app.put("/api/projects/{pid}/source")
+def save_source(pid: str, source: str = Body(..., embed=True)):
+    p = project_or_404(pid)
+    p.save_source(source)
+    return {"check": textprep.fact_check(source, p.script) if source.strip() else None}
+
+
+@app.put("/api/projects/{pid}/settings")
+def save_settings(pid: str, body: dict = Body(...)):
+    p = project_or_404(pid)
+    allowed = {k: body[k] for k in ("title", "voice", "persona", "pacing", "quality", "writer") if k in body}
+    if "voice" in allowed:
+        voice_or_404(allowed["voice"])
+    p.save_meta(**allowed)
+    return p.summary()
+
+
+@app.post("/api/projects/{pid}/regen")
+def regen(pid: str, key: str = Body(..., embed=True)):
+    p = project_or_404(pid)
+    p.drop_clip(key)
+    engine.WORKER.enqueue(pid)
+    return {"ok": True}
+
+
+# ---------- generation ----------
+
+@app.post("/api/generate/{pid}/start")
+def gen_start(pid: str):
+    project_or_404(pid)
+    if writer.JOB.get("state") == "running":
+        bad("A script is being written with Ollama. Wait for it to finish first.", 409)
+    engine.WORKER.start(pid)
+    return engine.WORKER.state()
+
+
+@app.post("/api/generate/pause")
+def gen_pause():
+    engine.WORKER.pause()
+    return engine.WORKER.state()
+
+
+@app.post("/api/preview")
+def preview(text: str = Body(...), voice: str = Body(...), quality: str = Body("best")):
+    v = voice_or_404(voice)
+    spoken = textprep.speak(text, store.pronunciations())
+    if not spoken:
+        bad("Type something to hear.")
+    return Response(engine.ENGINE.preview_wav_bytes(v, spoken, quality), media_type="audio/wav",
+                    headers={"X-Spoken": spoken.encode("ascii", "ignore").decode()})
+
+
+# ---------- export ----------
+
+@app.post("/api/projects/{pid}/export")
+def do_export(pid: str, partial: bool = Body(False), format: str = Body("mp3"),
+              quality: str = Body("high"), name: str = Body("")):
+    p = project_or_404(pid)
+    try:
+        return export.merge(p, partial=partial, fmt=format, quality=quality, name=name or None)
+    except ValueError as e:
+        bad(str(e))
+
+
+@app.post("/api/reveal")
+def reveal(path: str = Body(..., embed=True)):
+    f = Path(path).resolve()
+    if not f.exists() or not (str(f).startswith(str(store.DOWNLOADS)) or str(f).startswith(str(store.ROOT))):
+        bad("Can't show that file.")
+    subprocess.run(["/usr/bin/open", "-R", str(f)])
+    return {"ok": True}
+
+
+# ---------- pronunciations ----------
+
+@app.get("/api/pronunciations")
+def get_prons():
+    return store.pronunciations()
+
+
+@app.put("/api/pronunciations")
+def put_prons(rows: list = Body(...)):
+    return store.save_pronunciations(rows)
+
+
+# ---------- voices ----------
+
+@app.post("/api/voices")
+async def add_voice(file: UploadFile = File(...), name: str = Form(...), note: str = Form("")):
+    if not name.strip():
+        bad("Give the voice a name.")
+    with tempfile.NamedTemporaryFile(suffix=Path(file.filename or "clip.wav").suffix, delete=False) as tmp:
+        tmp.write(await file.read())
+    try:
+        return voices.add(tmp.name, file.filename or "clip.wav", name.strip(), note.strip())
+    except subprocess.CalledProcessError:
+        bad("Couldn't read that audio file.")
+    finally:
+        os.unlink(tmp.name)
+
+
+@app.put("/api/voices/{vid}")
+def update_voice(vid: str, body: dict = Body(...)):
+    v = voice_or_404(vid)
+    for k in ("name", "note", "transcript"):
+        if k in body:
+            v[k] = body[k]
+    return store.save_voice(v)
+
+
+@app.post("/api/voices/{vid}/trim")
+def trim_voice(vid: str, start: float = Body(...), end: float = Body(...)):
+    voice_or_404(vid)
+    if end - start < 2:
+        bad("Keep at least 2 seconds.")
+    return voices.retrim(vid, start, end)
+
+
+@app.post("/api/voices/{vid}/transcribe")
+def retranscribe(vid: str):
+    v = voice_or_404(vid)
+    v["transcript"] = engine.transcribe(store.voice_wav(vid))
+    return store.save_voice(v)
+
+
+# ---------- script writer (Ollama) ----------
+
+@app.get("/api/writer/models")
+def writer_models():
+    m = writer.models()
+    return {"running": m is not None, "models": m or []}
+
+
+@app.post("/api/projects/{pid}/write")
+def write_script(pid: str, model: str = Body(..., embed=True)):
+    p = project_or_404(pid)
+    if engine.WORKER.state()["running"]:
+        bad("Pause audio generation first. Both together don't fit in memory.", 409)
+    try:
+        writer.start(p, model, p.meta["writer"])
+    except (ValueError, RuntimeError) as e:
+        bad(str(e))
+    return writer.JOB
+
+
+# ---------- files ----------
+
+@app.get("/media/projects/{pid}/clips/{name}")
+def clip(pid: str, name: str):
+    f = (store.PROJECTS / pid / "clips" / name).resolve()
+    if f.parent != (store.PROJECTS / pid / "clips").resolve() or not f.exists():
+        raise HTTPException(404)
+    return FileResponse(f, media_type="audio/wav")
+
+
+@app.get("/media/voices/{vid}.wav")
+def voice_audio(vid: str):
+    voice_or_404(vid)
+    return FileResponse(store.voice_wav(vid), media_type="audio/wav")
+
+
+@app.get("/media/voices/{vid}/original")
+def voice_original(vid: str):
+    voice_or_404(vid)
+    f = next((store.VOICES / vid).glob("original.*"))
+    return FileResponse(f)
+
+
+@app.get("/")
+def root():
+    return RedirectResponse("/app/ui/index.html")
+
+
+app.mount("/app/ui", StaticFiles(directory=UI), name="ui")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8799
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
