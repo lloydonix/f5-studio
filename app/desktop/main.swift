@@ -6,6 +6,7 @@ import WebKit
 let home = FileManager.default.homeDirectoryForCurrentUser.path
 let port = 8799
 let startURL = URL(string: "http://127.0.0.1:\(port)/app/ui/index.html?app=1")!
+let apiURL = URL(string: "http://127.0.0.1:\(port)/api/state")!
 let serverScript = "\(home)/f5-tts/app/run_server.sh"
 let logPath = "\(home)/f5-tts/app/server.log"
 
@@ -14,19 +15,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     var web: WKWebView!
     var server: Process?
     var loading: NSTextField!
+    var starting = false      // a server start is in progress; don't start another
+    var pageLoaded = false
 
     func applicationDidFinishLaunching(_ note: Notification) {
         buildMenu()
         buildWindow()
-        if serverIsUp() { load() } else { startServer(); waitForServer(tries: 120) }
+        checkServer()
+        // Watchdog: a server left over from the last run can still answer at launch and then exit
+        // a moment later, so keep checking and restart it whenever it's gone.
+        Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.checkServer() }
+    }
+
+    func checkServer() {
+        guard !starting else { return }
+        DispatchQueue.global().async {
+            let up = self.serverIsUp()
+            DispatchQueue.main.async {
+                if up {
+                    if !self.pageLoaded { self.load() }
+                } else if !self.starting {
+                    self.pageLoaded = false
+                    self.loading.isHidden = false
+                    self.loading.stringValue = "Starting F5 Studio…"
+                    self.startServer()
+                    self.waitForServer(tries: 120)
+                }
+            }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ app: NSApplication) -> Bool { true }
 
     func applicationWillTerminate(_ note: Notification) {
-        guard let s = server, s.isRunning else { return }
-        s.terminate()   // SIGTERM to the server; it finishes the clip it's on and exits
-        s.waitUntilExit()
+        guard let s = server, s.isRunning else {
+            // We were using a server left over from an earlier run: stop that one instead.
+            let k = Process()
+            k.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+            k.arguments = ["-TERM", "-f", "studio.server \(port)"]
+            try? k.run(); k.waitUntilExit()
+            return
+        }
+        s.terminate()   // SIGTERM: the server finishes up and exits
+        let deadline = Date().addingTimeInterval(6)
+        while s.isRunning && Date() < deadline { usleep(100_000) }
+        if s.isRunning { kill(s.processIdentifier, SIGKILL) }   // never leave one behind
     }
 
     // MARK: window
@@ -81,11 +114,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         loading.isHidden = true
+        pageLoaded = true
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        pageLoaded = false      // the watchdog retries
         loading.isHidden = false
-        loading.stringValue = "Couldn't reach F5 Studio. See ~/f5-tts/app/server.log"
+        loading.stringValue = "Starting F5 Studio…"
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        pageLoaded = false
+        load()
     }
 
     // Links to anything other than the local app open in the default browser.
@@ -124,7 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     // MARK: server
 
     func serverIsUp() -> Bool {
-        var req = URLRequest(url: startURL); req.timeoutInterval = 0.5
+        var req = URLRequest(url: apiURL); req.timeoutInterval = 0.8
         let sem = DispatchSemaphore(value: 0); var ok = false
         URLSession.shared.dataTask(with: req) { _, resp, _ in
             ok = (resp as? HTTPURLResponse)?.statusCode == 200; sem.signal()
@@ -138,9 +178,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
         p.arguments = [serverScript, String(port)]
         p.currentDirectoryURL = URL(fileURLWithPath: "\(home)/f5-tts")
-        FileManager.default.createFile(atPath: logPath, contents: nil)
-        if let log = FileHandle(forWritingAtPath: logPath) { p.standardOutput = log; p.standardError = log }
+        if !FileManager.default.fileExists(atPath: logPath) { FileManager.default.createFile(atPath: logPath, contents: nil) }
+        if let log = FileHandle(forWritingAtPath: logPath) {
+            log.seekToEndOfFile()
+            log.write("\n--- starting \(Date())\n".data(using: .utf8)!)
+            p.standardOutput = log; p.standardError = log
+        }
+        starting = true
         do { try p.run(); server = p } catch {
+            starting = false
             loading.stringValue = "Couldn't start F5 Studio: \(error.localizedDescription)"
         }
     }
@@ -149,9 +195,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         DispatchQueue.global().async {
             let up = self.serverIsUp()
             DispatchQueue.main.async {
-                if up { self.load(); return }
+                if up { self.starting = false; self.load(); return }
                 if tries <= 0 || self.server?.isRunning == false {
-                    self.loading.stringValue = "F5 Studio didn't start. See ~/f5-tts/app/server.log"
+                    // e.g. the port was still held by a server that was shutting down; the watchdog retries
+                    self.starting = false
+                    self.loading.stringValue = "Starting F5 Studio… (retrying)"
                     return
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.waitForServer(tries: tries - 1) }

@@ -266,4 +266,6 @@ app.mount("/app/ui", StaticFiles(directory=UI), name="ui")
 if __name__ == "__main__":
     import uvicorn
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8799
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+    # Short graceful shutdown: the app window's keep-alive connections would otherwise hold the
+    # port open after Quit, and a quick reopen would find a dying server.
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning", timeout_graceful_shutdown=3)
