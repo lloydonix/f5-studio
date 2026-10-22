@@ -10,7 +10,7 @@ from collections import deque
 import numpy as np
 import soundfile as sf
 
-from . import store
+from . import parts, store
 
 NFE = {"best": 32, "fast": 16}
 SR = 24000
@@ -63,6 +63,7 @@ class Worker:
         self.paused = True
         self.current = None        # {"project", "si", "pi", "text", "started"}
         self.last_error = None
+        self.last_export = None    # the most recent auto-exported part, for a notice in the UI
         self.ratio = 6.5           # generation seconds per audio second, measured as we go
         self._recent = deque(maxlen=12)
         self._awake = None
@@ -97,6 +98,7 @@ class Worker:
             "current": cur and {k: cur[k] for k in ("project", "si", "pi", "text")} | {
                 "elapsed": round(time.time() - cur["started"], 1)},
             "error": self.last_error,
+            "last_export": self.last_export and {k: self.last_export[k] for k in ("name", "when", "part")},
         }
 
     # loop
@@ -141,6 +143,13 @@ class Worker:
                 if dur > 0.5:
                     self._recent.append(gen / dur)
                     self.ratio = sum(self._recent) / len(self._recent)
+                try:   # a split project's part just finished? export it now (auto-export)
+                    rec = parts.after_clip(p, para["si"])
+                    if rec:
+                        self.last_export = rec
+                        print(f"auto-exported {rec['name']}", flush=True)
+                except Exception:
+                    traceback.print_exc()
             except Exception as e:
                 traceback.print_exc()
                 self.last_error = f"{type(e).__name__}: {e}"

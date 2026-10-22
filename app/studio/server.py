@@ -11,7 +11,7 @@ from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import engine, export, inbox, store, textprep, voices
+from . import engine, export, inbox, parts, store, textprep, voices
 
 UI = Path(__file__).resolve().parent.parent / "ui"
 app = FastAPI(title="F5 Studio", docs_url=None, redoc_url=None)
@@ -76,6 +76,7 @@ def get_project(pid: str):
         **p.summary(sections), "script": p.script, "source": p.source, "sections": sections,
         "pacing": m["pacing"], "quality": m["quality"], "writer": m["writer"], "origin": m.get("origin"), "exports": p.exports(),
         "check": textprep.fact_check(p.source, p.script) if p.source.strip() else None,
+        "split": parts.summary(p, sections, engine.WORKER.ratio),
     }
 
 
@@ -140,12 +141,22 @@ def preview(text: str = Body(...), voice: str = Body(...), quality: str = Body("
 
 @app.post("/api/projects/{pid}/export")
 def do_export(pid: str, partial: bool = Body(False), format: str = Body("mp3"),
-              quality: str = Body("high"), name: str = Body("")):
+              quality: str = Body("high"), name: str = Body(""), part: int = Body(0)):
     p = project_or_404(pid)
     try:
-        return export.merge(p, partial=partial, fmt=format, quality=quality, name=name or None)
+        return export.merge(p, partial=partial, fmt=format, quality=quality, name=name or None, part=part or None)
     except ValueError as e:
         bad(str(e))
+
+
+@app.put("/api/projects/{pid}/split")
+def set_split(pid: str, body: dict = Body(...)):
+    """{enabled, hours, auto_export, dismissed}: any subset. Turning it on (or changing hours) re-plans the parts."""
+    p = project_or_404(pid)
+    if "hours" in body and not (0.5 <= float(body["hours"]) <= 48):
+        bad("Pick between half an hour and 48 hours.")
+    parts.update(p, body, p.sections(), engine.WORKER.ratio)
+    return parts.summary(p, p.sections(), engine.WORKER.ratio)
 
 
 @app.post("/api/reveal")

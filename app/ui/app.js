@@ -487,6 +487,43 @@
   });
   $("#pickVoice").onchange = e => { if (e.target.files[0]) addVoice(e.target.files[0]); e.target.value = ""; };
 
+  /* ---------- splitting long projects into parts (optional) ---------- */
+  function splitOfferHTML(sp) {
+    if (!sp.suggest) return "";
+    return `<div class="card card-pad offer">
+      <div><div class="card-title">This will take about ${fmtDur(sp.total_gen)} to generate</div>
+        <div class="small muted" style="margin-top:4px">Split it into ${sp.suggested} parts of up to ${sp.hours} hours each? Parts are whole sections, and each one is
+        saved to Downloads as soon as it's done, so you can start listening to Part 1 while the rest generates.</div></div>
+      <div class="row" style="flex-wrap:nowrap"><button class="btn" data-split="dismiss">Keep as one</button>
+        <button class="btn btn-primary" data-split="on">Split into ${sp.suggested} parts</button></div></div>`;
+  }
+  function partsStripHTML(sp) {
+    if (!sp.enabled || !sp.parts.length) return "";
+    return `<div class="parts-strip">${sp.parts.map(x => `
+      <div class="part-chip ${x.complete ? "done" : x.done ? "going" : ""}" title="${esc(x.first_title)} → ${esc(x.last_title)}">
+        <b>Part ${x.n}</b><span>${x.complete ? (x.exported ? "saved ✓" : "done") : `${Math.round(x.done / x.total * 100)}%`}</span>
+        <div class="mini"><div style="width:${x.done / x.total * 100}%"></div></div></div>`).join("")}</div>
+      <div class="small muted" style="margin-top:8px">Split into parts of up to ${sp.hours} hours${sp.auto_export ? ". Each part is saved to Downloads when it finishes." : ". Export each part from the Export step."}
+        <a href="#" data-goto="export">Part settings</a></div>`;
+  }
+  function bindSplit() {
+    $$("[data-split]").forEach(b => b.onclick = attempt(async e => {
+      e.preventDefault();
+      const v = b.dataset.split;
+      if (v === "on") await setSplit({ enabled: true }, "Split into parts. Each one saves to Downloads when it's done.");
+      else if (v === "dismiss") await setSplit({ dismissed: true }, "Keeping it as one file. You can still split it from the Export step.");
+      else if (v === "off") await setSplit({ enabled: false }, "Back to one file.");
+      else if (v === "redo") await setSplit({ enabled: true }, "Parts re-planned.");
+    }));
+    const auto = $("#splitAuto"); if (auto) auto.onchange = attempt(() => setSplit({ auto_export: auto.checked }, auto.checked ? "Each part will save itself when it's done." : "Export parts yourself from here."));
+    const hrs = $("#splitHours"); if (hrs) hrs.onchange = attempt(() => setSplit({ hours: +hrs.value }, S.project.split.enabled ? "Parts re-planned for the new limit." : "Limit changed."));
+  }
+  async function setSplit(change, msg) {
+    S.project.split = await api("PUT", `/api/projects/${S.pid}/split`, change);
+    if (S.step === "generate") renderGenerate(openSet(), true); else if (S.step === "export") renderExport();
+    toast(msg);
+  }
+
   /* ---------- 4. generate ---------- */
   function renderGenerate(keepOpen, keepScroll) {
     const p = S.project, paras = allParas(p), w = worker();
@@ -508,8 +545,10 @@
     const isCur = x => mine && w.current.si === x.si && w.current.pi === x.pi;
     const listTop = keepScroll ? $(".gen-list")?.scrollTop || 0 : 0;
 
+    const sp = p.split || {}, partStart = new Map((sp.enabled ? sp.parts : []).map(x => [x.first, x]));
     $("#view-generate").innerHTML = `
       <div class="stack">
+        ${splitOfferHTML(sp)}
         <div class="card card-pad">
           <div class="gen-bar">
             <div>
@@ -533,6 +572,7 @@
                 : `<button class="btn" disabled>${I.check}Done</button>`}
             </div>
           </div>
+          ${partsStripHTML(sp)}
           ${w.running && !mine && w.current ? `<p class="small muted" style="margin:12px 0 0">Busy with ${esc(titleOf(w.current.project))}. Starting this one puts it first.</p>` : ""}
         </div>
         <div class="card">
@@ -542,12 +582,12 @@
             <span class="small muted">Click a line to read it in full. "Check these" are lines whose pace looks off.</span>
           </div>
           <div class="gen-list">${p.sections.map((s, si) => {
-            const sp = s.paras.filter(show); if (!sp.length) return "";
-            const sd = s.paras.filter(x => x.dur).length;
-            return `<div class="sec ${open.has(si) || S.filter !== "all" ? "open" : ""}" data-si="${si}">
+            const vis = s.paras.filter(show); if (!vis.length) return "";
+            const sd = s.paras.filter(x => x.dur).length, pt = partStart.get(si);
+            return `${pt ? `<div class="part-head"><b>Part ${pt.n} of ${sp.parts.length}</b><span>${pt.complete ? (pt.exported ? "done · saved to Downloads" : "done") : `${pt.done}/${pt.total} · ~${fmtDur(pt.gen_left)} left`}</span></div>` : ""}<div class="sec ${open.has(si) || S.filter !== "all" ? "open" : ""}" data-si="${si}">
               <div class="sec-head">${I.chev}<span class="sec-title">${esc(s.title.toLowerCase())}</span>
                 <span class="sec-count">${sd}/${s.paras.length}</span><div class="mini"><div style="width:${sd / s.paras.length * 100}%"></div></div></div>
-              <div class="paras">${sp.map(x => {
+              <div class="paras">${vis.map(x => {
                 const st = isCur(x) ? "busy" : !x.dur ? "queued" : isFlagged(x) ? "warn" : "done";
                 return `<div class="para ${st === "queued" ? "queued" : ""}"><span class="dot dot-${st}"></span>
                   <div class="para-text">${esc(x.text)}</div>
@@ -563,6 +603,7 @@
       </div>`;
 
     $$("#filters button").forEach(b => b.onclick = () => { S.filter = b.dataset.f; renderGenerate(); });
+    bindSplit();
     $$("#qualitySeg button").forEach(b => b.onclick = attempt(async () => {
       await api("PUT", `/api/projects/${p.id}/settings`, { quality: b.dataset.q }); p.quality = b.dataset.q; renderGenerate(openSet(), true);
     }));
@@ -598,13 +639,15 @@
     const lastFull = p.sections.findIndex(s => s.paras.some(x => !x.dur));
     const partialSecs = (lastFull < 0 ? p.sections : p.sections.slice(0, lastFull)).reduce((a, s) => a + s.paras.reduce((b, x) => b + (x.dur || 0), 0), 0);
     const name = o.name || p.title.replace(" · ", " - ");
+    const sp = p.split || {}, starts = new Set((sp.enabled ? sp.parts : []).slice(1).map(x => x.first));
     $("#view-export").innerHTML = `
       <div class="grid-side">
         <div class="stack">
           <div class="card card-pad">
             <div class="row" style="margin-bottom:10px"><div class="card-title">Timeline</div><span class="spacer"></span>
               <span class="small muted">${p.sections.length} sections · grey isn't generated yet</span></div>
-            <div class="timeline">${p.sections.map((s, i) => `<div class="${s.paras.some(x => !x.dur) ? "missing" : ""}" style="flex:${secDur[i] / total}" title="${esc(s.title)}"></div>`).join("")}</div>
+            <div class="timeline">${p.sections.map((s, i) => `<div class="${s.paras.some(x => !x.dur) ? "missing" : ""} ${starts.has(i) ? "part-start" : ""}" style="flex:${secDur[i] / total}" title="${esc(s.title)}"></div>`).join("")}</div>
+            ${sp.enabled ? `<div class="small muted" style="margin-top:8px">Marks show where each of the ${sp.parts.length} parts begins.</div>` : ""}
           </div>
           <div class="card card-pad">
             <div class="card-title" style="margin-bottom:4px">Export</div>
@@ -615,11 +658,12 @@
               <div style="flex:1"><div style="font-weight:600">Finished sections only</div><div class="small muted">${fmtDur(partialSecs)} · stops at the end of the last complete section</div></div>
               <button class="btn" id="expPart" ${partialSecs ? "" : "disabled"}>Export partial</button></div>
           </div>
+          ${partsCardHTML(sp)}
           <div class="card card-pad">
             <div class="card-title" style="margin-bottom:4px">Exported from F5 Studio</div>
             ${p.exports.length ? p.exports.map((e, i) => `<div class="export-row"><div class="file-ic">${I.file}</div>
               <div style="flex:1;min-width:0"><div style="font-weight:600;overflow-wrap:anywhere">${esc(e.name)}</div>
-              <div class="small muted">${fmtDur(e.secs)} · ${e.partial ? `first ${e.sections} sections` : "complete"} · ${new Date(e.when * 1000).toLocaleString()}</div></div>
+              <div class="small muted">${fmtDur(e.secs)} · ${e.part ? `part ${e.part}` : e.partial ? `first ${e.sections} sections` : "complete"} · ${new Date(e.when * 1000).toLocaleString()}</div></div>
               <button class="btn btn-ghost" data-reveal="${i}">Show in Finder</button></div>`).join("")
               : '<p class="small muted" style="margin:8px 0 0">Nothing yet. Files go to your Downloads folder.</p>'}
           </div>
@@ -651,6 +695,34 @@
     $("#expFull").onclick = ex(false);
     $("#expPart").onclick = ex(true);
     $$("[data-reveal]").forEach(b => b.onclick = attempt(() => api("POST", "/api/reveal", { path: p.exports[+b.dataset.reveal].path })));
+    $$("[data-exppart]").forEach(b => b.onclick = attempt(async () => {
+      toast("Exporting…", 20000);
+      const r = await api("POST", `/api/projects/${p.id}/export`, { part: +b.dataset.exppart, format: o.format, quality: o.quality });
+      await reloadProject(); toast(`Saved ${r.name} to Downloads (${fmtDur(r.secs)}).`, 5000);
+    }));
+    bindSplit();
+  }
+  function partsCardHTML(sp) {
+    const hours = `<select id="splitHours" style="width:auto">${[3, 4, 5, 6, 8, 12].map(h => `<option value="${h}" ${+sp.hours === h ? "selected" : ""}>${h} hours</option>`).join("")}</select>`;
+    if (!sp.enabled) return `<div class="card card-pad">
+      <div class="row"><div class="card-title">Parts</div><span class="spacer"></span><span class="small muted">Optional</span></div>
+      <p class="small muted" style="margin:6px 0 12px">Generating everything takes about <b>${fmtDur(sp.total_gen)}</b>.
+        ${sp.over ? `That's over the limit, so it would split into <b>${sp.suggested} parts</b>.` : "That's within the limit, so it stays one file unless you split it."}
+        Each part is whole sections, saved to Downloads as soon as it's done.</p>
+      <div class="row"><span class="small">Up to</span>${hours}<span class="small">of generation per part</span><span class="spacer"></span>
+        <button class="btn ${sp.over ? "btn-primary" : ""}" data-split="on">Split into parts</button></div></div>`;
+    return `<div class="card card-pad">
+      <div class="row"><div class="card-title">Parts</div><span class="spacer"></span>
+        <button class="btn btn-ghost" data-split="redo" title="Plan the parts again from the current script and speed">Re-plan</button>
+        <button class="btn btn-ghost" data-split="off">Don't split</button></div>
+      ${sp.parts.map(x => `<div class="export-row"><div class="file-ic">${I.file}</div>
+        <div style="flex:1;min-width:0"><div style="font-weight:600">Part ${x.n} of ${sp.parts.length}</div>
+          <div class="small muted" style="overflow-wrap:anywhere">${esc(x.first_title.toLowerCase())} → ${esc(x.last_title.toLowerCase())}</div>
+          <div class="small muted">${x.complete ? `${fmtDur(x.audio)} of audio${x.exported ? ` · saved as ${esc(x.file || "")}` : ""}` : `${x.done}/${x.total} paragraphs · about ${fmtDur(x.gen_left)} left`}</div></div>
+        <button class="btn ${x.complete && !x.exported ? "btn-primary" : ""}" data-exppart="${x.n}" ${x.complete ? "" : "disabled"}>${x.exported ? "Export again" : "Export"}</button></div>`).join("")}
+      <div class="row" style="margin-top:12px"><span class="small">Up to</span>${hours}<span class="small">per part</span></div>
+      <label class="toggle"><input type="checkbox" id="splitAuto" ${sp.auto_export ? "checked" : ""}><span class="sw"></span><span><span class="t">Save each part to Downloads when it finishes</span><br>
+        <span class="d">Uses the format and quality set on the right.</span></span></label></div>`;
   }
 
   /* ---------- the Cogitator (Scriptorium scripts from ~/study) ---------- */
@@ -757,6 +829,11 @@
         const st = await api("GET", "/api/status");
         const was = S.overview.worker.running;
         S.overview.worker = st.worker;
+        const le = st.worker.last_export;
+        if (le && le.when !== S.lastExportWhen) {
+          if (S.lastExportWhen !== undefined) toast(`Part ${le.part} is done and saved to Downloads: ${le.name}`, 7000);
+          S.lastExportWhen = le.when;
+        }
         if (st.project) { const i = S.overview.projects.findIndex(p => p.id === st.project.id); if (i >= 0) S.overview.projects[i] = st.project; }
         renderSidebar(); renderHeader();
         const cur = st.worker.current ? `${st.worker.current.project}:${st.worker.current.si}:${st.worker.current.pi}` : null;
@@ -798,6 +875,7 @@
     try { await loadOverview(); await loadProject(); }
     catch (e) { document.body.innerHTML = `<div class="empty"><b>Can't reach the F5 Studio server</b>${esc(e.message)}</div>`; return; }
     renderSidebar(); go(S.step);
+    S.lastExportWhen = worker().last_export?.when ?? null;
     if (worker().running) poll();
     loadCog(); setInterval(loadCog, 10000);
   })();

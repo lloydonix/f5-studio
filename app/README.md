@@ -11,7 +11,8 @@ Dock (`~/Applications/F5 Studio.app`); quitting it stops everything.
 - `studio/` — the backend (FastAPI, in `~/f5-tts/.venv`):
   - `server.py` API + UI, `store.py` files on disk, `textprep.py` script → spoken paragraphs,
     `engine.py` F5 model + generation queue, `export.py` merge → Downloads, `voices.py` clips,
-    `inbox.py` the Cogitator bridge (below).
+    `inbox.py` the Cogitator bridge (below), `parts.py` optional splitting of long projects into parts
+    (planned once from the generation-time estimate, by whole sections; each part can auto-export when done).
 - **The Cogitator bridge** (`studio/inbox.py`): the sidebar's "From the Cogitator" list shows the
   tutor scripts that the Scriptorium in `~/study` saves to `~/study/scripts/`. A script counts as
   ready when the Scriptorium's job (`127.0.0.1:8779/scriptorium/api/job`) is no longer writing it and

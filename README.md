@@ -16,7 +16,9 @@ and a merged MP3 in Downloads at the end.
 - **Voice**: drop in a clip; it's trimmed, converted to 24 kHz and transcribed with Whisper.
 - **Generate**: a queue that survives restarts. Clips are keyed by their text, so editing one line
   only redoes that line. Lines with an unusual pace get flagged for a listen.
-- **Export**: everything, or only the finished sections, with adjustable pauses.
+- **Export**: everything, or only the finished sections, with adjustable pauses. Long projects (over
+  5 hours to generate, adjustable) can optionally be split into parts that save themselves to Downloads
+  as each one finishes.
 
 Everything stays on the Mac. There are no accounts or paid APIs, and the Hugging Face hub isn't
 contacted after the first model download.
