@@ -317,3 +317,8 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .part-head { display: flex; gap: 10px; align-items: baseline; padding: 10px 18px 6px; background: var(--panel-2); border-bottom: 1px solid var(--line); font-size: 12.5px; position: sticky; top: 0; z-index: 1; }
 .part-head span { color: var(--muted); }
 .timeline > div.part-start { box-shadow: -3px 0 0 var(--text); }
+
+/* sidebar lists scroll on their own, so a long list never pushes the Library off screen */
+#projectList { max-height: 38vh; overflow-y: auto; }
+#cogList { max-height: 26vh; overflow-y: auto; }
+#projectList, #cogList { scrollbar-width: thin; padding-right: 2px; }

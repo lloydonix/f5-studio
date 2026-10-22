@@ -203,7 +203,9 @@ def projects():
             out.append(Project(f.parent.name))
         except KeyError:
             pass
-    return sorted(out, key=lambda p: (p.meta.get("order", 999), p.meta.get("title", "")))
+    # Newest first. Projects without a creation time (the migrated Civ Pro parts) go by their part
+    # order, last part first, below anything created in the app.
+    return sorted(out, key=lambda p: (-(p.meta.get("created") or 0), -(p.meta.get("order") or 0), p.meta.get("title", "")))
 
 
 def create_project(title, voice_id, persona=""):
