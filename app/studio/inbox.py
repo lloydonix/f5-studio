@@ -106,7 +106,7 @@ def open_cogitator():
         subprocess.run(["/usr/bin/open", "http://127.0.0.1:8779/scriptorium"])
 
 
-def import_script(name, voice_id=None, generate=False, project_id=None):
+def import_script(name, voice_id=None, generate=False, project_id=None, replace=False):
     """Create a project from a Cogitator script, or update the one made from it before.
     With project_id, the script goes into that project instead (and links it to the file)."""
     f = SCRIPTS / Path(name).name
@@ -116,6 +116,10 @@ def import_script(name, voice_id=None, generate=False, project_id=None):
     persona = m["voice"] if m else ""
     with _lock:
         proj = store.Project(project_id) if project_id else _imported().get(f.name, (None, 0))[0]
+        if project_id and not replace and (proj.meta.get("origin") or {}).get("cogitator") != f.name \
+                and proj.summary()["done"]:
+            raise PermissionError("That project already has audio for a different script. "
+                                  "Import this one as a new project, or confirm replacing it.")
         if project_id and persona and not proj.meta.get("persona"):
             proj.save_meta(persona=persona)
         if not proj:

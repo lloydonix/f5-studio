@@ -1,4 +1,4 @@
-"""Merge a project's paragraph clips into one file in ~/Downloads."""
+"""Merge a project's paragraph clips into one file in ~/f5-tts/exports/<project title>/."""
 import re, subprocess, time
 from pathlib import Path
 
@@ -55,14 +55,15 @@ def merge(project, partial=False, fmt="mp3", quality="high", name=None, part=Non
     audio = np.concatenate(parts)
 
     name = re.sub(r'[/:\\]', "-", (name or project.meta.get("title", project.id)).strip()) or project.id
-    store.DOWNLOADS.mkdir(exist_ok=True)
+    folder = project.export_dir
+    folder.mkdir(parents=True, exist_ok=True)
     wav = project.dir / "export.wav"
     sf.write(str(wav), audio, SR)
     if fmt == "wav":
-        out = store.DOWNLOADS / f"{name}.wav"
+        out = folder / f"{name}.wav"
         wav.replace(out)
     else:
-        out = store.DOWNLOADS / f"{name}.mp3"
+        out = folder / f"{name}.mp3"
         subprocess.run(["/opt/homebrew/bin/ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav),
                         "-c:a", "libmp3lame", "-q:a", MP3_Q.get(quality, "2"), str(out)], check=True)
         wav.unlink()

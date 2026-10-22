@@ -19,7 +19,8 @@ PROJECTS = ROOT / "projects"
 STUDIO = ROOT / "studio"
 VOICES = STUDIO / "voices"
 PRON_FILE = STUDIO / "pronunciations.json"
-DOWNLOADS = Path.home() / "Downloads"
+DOWNLOADS = Path.home() / "Downloads"   # older exports went here; still allowed for Show in Finder
+EXPORTS = ROOT / "exports"              # exports/<project title>/<file>.mp3
 
 DEFAULT_PACING = {"para": 0.45, "heading": 0.7, "section": 1.3}
 _lock = threading.RLock()
@@ -185,6 +186,11 @@ class Project:
             "done": sum(1 for p in paras if p["dur"]), "total": len(paras),
             "audio": round(sum(p["dur"] or 0 for p in paras), 1),
         }
+
+    @property
+    def export_dir(self):
+        name = re.sub(r'[/:\\]', '-', self.meta.get('title', self.id)).strip(' .') or self.id
+        return EXPORTS / name
 
     def exports(self):
         return [e for e in self.meta.get("exports", []) if Path(e["path"]).exists()]

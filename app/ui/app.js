@@ -55,6 +55,7 @@
     const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
     return h ? `${h}h ${m}m` : m ? `${m}m ${String(sec).padStart(2, "0")}s` : `${sec}s`;
   };
+  const shortPath = f => String(f || "").replace(/^\/Users\/[^/]+/, "~");
   const words = t => t.trim() ? t.trim().split(/\s+/).length : 0;
   const allParas = p => p.sections.flatMap(s => s.paras);
   const wpm = x => words(x.text) / x.dur * 60;
@@ -166,6 +167,7 @@
     if (!c.available) return `<p class="small muted" style="margin:14px 0 0">The Cogitator's scripts folder (~/study/scripts) isn't there yet.</p>`;
     const linked = p.origin?.cogitator, li = c.items.find(i => i.name === linked);
     const ready = c.items.filter(i => i.state !== "writing");
+    const protect = !linked && (p.done > 0 || p.script.trim());   // don't swap scripts in a project that has its own
     return `
       ${linked ? `<div class="row" style="margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--panel-2)">
         <span class="small"><b>Linked to</b> ${esc(linked.replace(/\.txt$/, ""))}${li ? ` · ${li.changed ? '<span class="tag tag-updated">updated in the Cogitator</span>' : '<span class="tag tag-imported">up to date</span>'}` : ' · <span class="tag tag-incomplete">no longer in the folder</span>'}</span>
@@ -174,8 +176,12 @@
         <select id="cogSel" style="flex:1" ${ready.length ? "" : "disabled"}>${ready.length ? ready.map(i => `<option value="${esc(i.name)}" ${i.name === linked ? "selected" : ""}>
           ${esc(i.subject)} · ${esc(i.label)} (${esc(i.voice)}, ${i.words.toLocaleString()} words${i.state === "incomplete" ? ", unfinished" : ""})</option>`).join("")
           : "<option>No finished scripts yet</option>"}</select>
-        <button class="btn btn-primary" id="cogUse" ${ready.length ? "" : "disabled"}>Use this script</button>
+        ${protect
+          ? `<button class="btn btn-primary" id="cogNew" ${ready.length ? "" : "disabled"}>Import as a new project</button>`
+          : `<button class="btn btn-primary" id="cogUse" ${ready.length ? "" : "disabled"}>Use this script</button>`}
       </div>
+      ${protect && ready.length ? `<div class="row" style="margin-top:8px"><span class="small muted">This project already has ${p.done ? `audio for ${p.done} paragraphs` : "its own script"}, so a Cogitator script becomes a new project.</span>
+        <span class="spacer"></span><button class="btn btn-ghost" id="cogUse">Replace this project's script instead</button></div>` : ""}
       ${c.items.some(i => i.state === "writing") ? `<p class="small muted" style="margin:8px 0 0">${c.items.filter(i => i.state === "writing").map(i => esc(i.subject + " · " + i.label)).join(", ")} is still being written${c.job?.total ? ` (${c.job.done}/${c.job.total})` : ""}.</p>` : ""}
       <div class="row" style="margin-top:12px"><button class="btn" id="cogOpen">Open the Cogitator</button>
         <span class="small muted">Write it in the Scriptorium (Workspace → Scriptorium), then pick it above.</span></div>`;
@@ -255,16 +261,27 @@
   function bindCogPicker() {
     const use = $("#cogUse");
     if (use) use.onclick = attempt(() => useCogScript($("#cogSel").value));
+    const nw = $("#cogNew");
+    if (nw) nw.onclick = attempt(() => importCogAsNew($("#cogSel").value));
     $$("[data-cogpull]").forEach(b => b.onclick = attempt(() => useCogScript(b.dataset.cogpull)));
     const op = $("#cogOpen");
     if (op) op.onclick = attempt(() => api("POST", "/api/cogitator/open"));
   }
+  async function importCogAsNew(name) {
+    const it = S.cog.items.find(i => i.name === name);
+    if (it?.project) { await selectProject(it.project); return toast("That script already has its own project. Here it is."); }
+    const pr = await api("POST", "/api/cogitator/import", { name });
+    await loadCog(); await loadOverview(); await selectProject(pr.id); go("script");
+    toast(`Imported as a new project: ${pr.title}.`);
+  }
   async function useCogScript(name) {
     if (S.scriptDirty || S.sourceDirty) return toast("Save your text first.");
-    const p = S.project, it = S.cog.items.find(i => i.name === name);
-    if (p.script.trim() && p.origin?.cogitator !== name &&
-        !confirm(`Replace this project's script with "${it ? it.subject + " · " + it.label : name}"? Paragraphs that stay the same keep their audio.`)) return;
-    await api("POST", "/api/cogitator/import", { name, project: p.id });
+    const p = S.project, it = S.cog.items.find(i => i.name === name), label = it ? it.subject + " · " + it.label : name;
+    const replacing = p.script.trim() && p.origin?.cogitator !== name;
+    if (replacing && !confirm(p.done
+        ? `Replace "${p.title}" with "${label}"?\n\nIts current script has audio for ${p.done} paragraphs. That audio stays on disk, but none of it will match the new script.`
+        : `Replace this project's script with "${label}"?`)) return;
+    await api("POST", "/api/cogitator/import", { name, project: p.id, replace: !!replacing });
     await loadProject(); await refreshOverview(); await loadCog(); renderScript();
     toast(`Script loaded: ${S.project.total} paragraphs, ${S.project.done} already have audio.`);
   }
@@ -493,7 +510,7 @@
     return `<div class="card card-pad offer">
       <div><div class="card-title">This will take about ${fmtDur(sp.total_gen)} to generate</div>
         <div class="small muted" style="margin-top:4px">Split it into ${sp.suggested} parts of up to ${sp.hours} hours each? Parts are whole sections, and each one is
-        saved to Downloads as soon as it's done, so you can start listening to Part 1 while the rest generates.</div></div>
+        saved to this project's exports folder as soon as it's done, so you can start listening to Part 1 while the rest generates.</div></div>
       <div class="row" style="flex-wrap:nowrap"><button class="btn" data-split="dismiss">Keep as one</button>
         <button class="btn btn-primary" data-split="on">Split into ${sp.suggested} parts</button></div></div>`;
   }
@@ -503,14 +520,14 @@
       <div class="part-chip ${x.complete ? "done" : x.done ? "going" : ""}" title="${esc(x.first_title)} → ${esc(x.last_title)}">
         <b>Part ${x.n}</b><span>${x.complete ? (x.exported ? "saved ✓" : "done") : `${Math.round(x.done / x.total * 100)}%`}</span>
         <div class="mini"><div style="width:${x.done / x.total * 100}%"></div></div></div>`).join("")}</div>
-      <div class="small muted" style="margin-top:8px">Split into parts of up to ${sp.hours} hours${sp.auto_export ? ". Each part is saved to Downloads when it finishes." : ". Export each part from the Export step."}
+      <div class="small muted" style="margin-top:8px">Split into parts of up to ${sp.hours} hours${sp.auto_export ? ". Each part is saved to the exports folder when it finishes." : ". Export each part from the Export step."}
         <a href="#" data-goto="export">Part settings</a></div>`;
   }
   function bindSplit() {
     $$("[data-split]").forEach(b => b.onclick = attempt(async e => {
       e.preventDefault();
       const v = b.dataset.split;
-      if (v === "on") await setSplit({ enabled: true }, "Split into parts. Each one saves to Downloads when it's done.");
+      if (v === "on") await setSplit({ enabled: true }, "Split into parts. Each one saves to the exports folder when it's done.");
       else if (v === "dismiss") await setSplit({ dismissed: true }, "Keeping it as one file. You can still split it from the Export step.");
       else if (v === "off") await setSplit({ enabled: false }, "Back to one file.");
       else if (v === "redo") await setSplit({ enabled: true }, "Parts re-planned.");
@@ -562,12 +579,14 @@
                 <span>Speed <b>${w.ratio}× slower than real time</b></span>
                 <span>${running ? "Keeping the Mac awake" : "Pauses after the current paragraph"}</span>
               </div>
+              <div class="small muted" style="margin-top:6px">Exports are saved in <b>${esc(shortPath(p.export_dir))}</b></div>
               ${w.error && !running ? `<div class="err" style="margin-top:12px">Stopped: ${esc(w.error)}</div>` : ""}
             </div>
             <div class="row" style="flex-wrap:nowrap">
               <div class="seg" id="qualitySeg" title="Fast is about 1.5× quicker, slightly rougher">
                 <button data-q="best" class="${p.quality === "best" ? "on" : ""}">Best</button>
                 <button data-q="fast" class="${p.quality === "fast" ? "on" : ""}">Fast</button></div>
+              <button class="btn" data-showexports title="Open this project's exports folder">${I.file}Show in Finder</button>
               ${left.length ? `<button class="btn btn-primary" id="runBtn">${running ? I.pause + "Pause" : I.play + (done ? "Resume" : "Start")}</button>`
                 : `<button class="btn" disabled>${I.check}Done</button>`}
             </div>
@@ -584,7 +603,7 @@
           <div class="gen-list">${p.sections.map((s, si) => {
             const vis = s.paras.filter(show); if (!vis.length) return "";
             const sd = s.paras.filter(x => x.dur).length, pt = partStart.get(si);
-            return `${pt ? `<div class="part-head"><b>Part ${pt.n} of ${sp.parts.length}</b><span>${pt.complete ? (pt.exported ? "done · saved to Downloads" : "done") : `${pt.done}/${pt.total} · ~${fmtDur(pt.gen_left)} left`}</span></div>` : ""}<div class="sec ${open.has(si) || S.filter !== "all" ? "open" : ""}" data-si="${si}">
+            return `${pt ? `<div class="part-head"><b>Part ${pt.n} of ${sp.parts.length}</b><span>${pt.complete ? (pt.exported ? "done · saved" : "done") : `${pt.done}/${pt.total} · ~${fmtDur(pt.gen_left)} left`}</span></div>` : ""}<div class="sec ${open.has(si) || S.filter !== "all" ? "open" : ""}" data-si="${si}">
               <div class="sec-head">${I.chev}<span class="sec-title">${esc(s.title.toLowerCase())}</span>
                 <span class="sec-count">${sd}/${s.paras.length}</span><div class="mini"><div style="width:${sd / s.paras.length * 100}%"></div></div></div>
               <div class="paras">${vis.map(x => {
@@ -660,12 +679,13 @@
           </div>
           ${partsCardHTML(sp)}
           <div class="card card-pad">
-            <div class="card-title" style="margin-bottom:4px">Exported from F5 Studio</div>
+            <div class="row" style="margin-bottom:4px"><div class="card-title">Exported from F5 Studio</div><span class="spacer"></span>
+              <button class="btn" data-showexports>${I.file}Show in Finder</button></div>
             ${p.exports.length ? p.exports.map((e, i) => `<div class="export-row"><div class="file-ic">${I.file}</div>
               <div style="flex:1;min-width:0"><div style="font-weight:600;overflow-wrap:anywhere">${esc(e.name)}</div>
               <div class="small muted">${fmtDur(e.secs)} · ${e.part ? `part ${e.part}` : e.partial ? `first ${e.sections} sections` : "complete"} · ${new Date(e.when * 1000).toLocaleString()}</div></div>
               <button class="btn btn-ghost" data-reveal="${i}">Show in Finder</button></div>`).join("")
-              : '<p class="small muted" style="margin:8px 0 0">Nothing yet. Files go to your Downloads folder.</p>'}
+              : `<p class="small muted" style="margin:8px 0 0">Nothing yet. Files go to ${esc(shortPath(p.export_dir))}.</p>`}
           </div>
         </div>
         <div class="card card-pad">
@@ -679,7 +699,7 @@
           <select id="qSel">${[["high", "High (about 190 kbps)"], ["standard", "Standard (about 130 kbps)"], ["small", "Small (about 96 kbps)"]].map(([k, l]) => `<option value="${k}" ${o.quality === k ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
           <label class="label" style="margin-top:14px">File name</label>
           <input type="text" id="expName" value="${esc(name)}">
-          <p class="small muted" style="margin:10px 0 0">Saved to Downloads. A file with the same name is replaced.</p>
+          <p class="small muted" style="margin:10px 0 0">Saved in ${esc(shortPath(p.export_dir))}. A file with the same name is replaced.</p>
         </div>
       </div>`;
     const savePacing = debounce(attempt(() => api("PUT", `/api/projects/${p.id}/settings`, { pacing: p.pacing })), 400);
@@ -690,7 +710,7 @@
     const ex = partial => attempt(async () => {
       toast("Exporting…", 20000);
       const r = await api("POST", `/api/projects/${p.id}/export`, { partial, format: o.format, quality: o.quality, name: $("#expName").value });
-      await reloadProject(); toast(`Saved ${r.name} to Downloads (${fmtDur(r.secs)}).`, 5000);
+      await reloadProject(); toast(`Saved ${r.name} (${fmtDur(r.secs)}) in the exports folder.`, 5000);
     });
     $("#expFull").onclick = ex(false);
     $("#expPart").onclick = ex(true);
@@ -698,7 +718,7 @@
     $$("[data-exppart]").forEach(b => b.onclick = attempt(async () => {
       toast("Exporting…", 20000);
       const r = await api("POST", `/api/projects/${p.id}/export`, { part: +b.dataset.exppart, format: o.format, quality: o.quality });
-      await reloadProject(); toast(`Saved ${r.name} to Downloads (${fmtDur(r.secs)}).`, 5000);
+      await reloadProject(); toast(`Saved ${r.name} (${fmtDur(r.secs)}) in the exports folder.`, 5000);
     }));
     bindSplit();
   }
@@ -708,7 +728,7 @@
       <div class="row"><div class="card-title">Parts</div><span class="spacer"></span><span class="small muted">Optional</span></div>
       <p class="small muted" style="margin:6px 0 12px">Generating everything takes about <b>${fmtDur(sp.total_gen)}</b>.
         ${sp.over ? `That's over the limit, so it would split into <b>${sp.suggested} parts</b>.` : "That's within the limit, so it stays one file unless you split it."}
-        Each part is whole sections, saved to Downloads as soon as it's done.</p>
+        Each part is whole sections, saved to the exports folder as soon as it's done.</p>
       <div class="row"><span class="small">Up to</span>${hours}<span class="small">of generation per part</span><span class="spacer"></span>
         <button class="btn ${sp.over ? "btn-primary" : ""}" data-split="on">Split into parts</button></div></div>`;
     return `<div class="card card-pad">
@@ -721,7 +741,7 @@
           <div class="small muted">${x.complete ? `${fmtDur(x.audio)} of audio${x.exported ? ` · saved as ${esc(x.file || "")}` : ""}` : `${x.done}/${x.total} paragraphs · about ${fmtDur(x.gen_left)} left`}</div></div>
         <button class="btn ${x.complete && !x.exported ? "btn-primary" : ""}" data-exppart="${x.n}" ${x.complete ? "" : "disabled"}>${x.exported ? "Export again" : "Export"}</button></div>`).join("")}
       <div class="row" style="margin-top:12px"><span class="small">Up to</span>${hours}<span class="small">per part</span></div>
-      <label class="toggle"><input type="checkbox" id="splitAuto" ${sp.auto_export ? "checked" : ""}><span class="sw"></span><span><span class="t">Save each part to Downloads when it finishes</span><br>
+      <label class="toggle"><input type="checkbox" id="splitAuto" ${sp.auto_export ? "checked" : ""}><span class="sw"></span><span><span class="t">Save each part to the exports folder when it finishes</span><br>
         <span class="d">Uses the format and quality set on the right.</span></span></label></div>`;
   }
 
@@ -831,7 +851,7 @@
         S.overview.worker = st.worker;
         const le = st.worker.last_export;
         if (le && le.when !== S.lastExportWhen) {
-          if (S.lastExportWhen !== undefined) toast(`Part ${le.part} is done and saved to Downloads: ${le.name}`, 7000);
+          if (S.lastExportWhen !== undefined) toast(`Part ${le.part} is done and saved: ${le.name}`, 7000);
           S.lastExportWhen = le.when;
         }
         if (st.project) { const i = S.overview.projects.findIndex(p => p.id === st.project.id); if (i >= 0) S.overview.projects[i] = st.project; }
@@ -849,6 +869,7 @@
   }
 
   document.addEventListener("click", e => {
+    if (e.target.closest("[data-showexports]")) { attempt(() => api("POST", `/api/projects/${S.pid}/exports/reveal`))(); return; }
     const pi = e.target.closest("[data-pid]"); if (pi) { selectProject(pi.dataset.pid); return; }
     const st = e.target.closest("[data-step]"); if (st) { go(st.dataset.step); return; }
     const g = e.target.closest("[data-goto]"); if (g) { go(g.dataset.goto); return; }

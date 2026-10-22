@@ -3,7 +3,7 @@
 Parts are runs of whole sections. The boundaries are planned once, when splitting is turned on, and stored
 (project.json "split.starts": the first section of each part), so they don't move while the speed estimate
 changes during generation. Generation runs in order, so parts finish one after another; with auto-export on,
-each part's MP3 goes to Downloads as soon as its last paragraph is done.
+each part's MP3 goes to the project's exports folder as soon as its last paragraph is done.
 """
 import hashlib
 

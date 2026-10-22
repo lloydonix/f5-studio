@@ -10,7 +10,7 @@ Dock (`~/Applications/F5 Studio.app`); quitting it stops everything.
 - `run_server.sh` — what the app runs on launch: the backend on `127.0.0.1:8799`, log in `server.log`.
 - `studio/` — the backend (FastAPI, in `~/f5-tts/.venv`):
   - `server.py` API + UI, `store.py` files on disk, `textprep.py` script → spoken paragraphs,
-    `engine.py` F5 model + generation queue, `export.py` merge → Downloads, `voices.py` clips,
+    `engine.py` F5 model + generation queue, `export.py` merge → `~/f5-tts/exports/<project>/`, `voices.py` clips,
     `inbox.py` the Cogitator bridge (below), `parts.py` optional splitting of long projects into parts
     (planned once from the generation-time estimate, by whole sections; each part can auto-export when done).
 - **The Cogitator bridge** (`studio/inbox.py`): the sidebar's "From the Cogitator" list shows the
@@ -19,7 +19,8 @@ Dock (`~/Applications/F5 Studio.app`); quitting it stops everything.
   it ends with its sign-off. Import makes it a project, or updates the project made from it before;
   unchanged paragraphs keep their audio. The gear button turns on automatic import (and generation),
   and maps each character to an F5 voice. In a project's Script step, "The Cogitator" picks one of
-  these scripts for that project, and "Open the Cogitator" brings up its app. F5 Studio only reads
+  these scripts for that project (or imports it as a new project when the open one already has
+  its own script or audio; replacing then needs a confirmation), and "Open the Cogitator" brings up its app. F5 Studio only reads
   `~/study`; it never writes there.
 - `ui/` — the front end (plain HTML/CSS/JS).
 
@@ -30,6 +31,7 @@ Dock (`~/Applications/F5 Studio.app`); quitting it stops everything.
   redoes that line).
 - `~/f5-tts/studio/voices/<id>/` — `voice.json`, `clip.wav` (trimmed, 24 kHz), `original.*`.
 - `~/f5-tts/studio/pronunciations.json` — the shared pronunciation list.
+- `~/f5-tts/exports/<project title>/` — exported MP3/WAV files (Show in Finder opens it).
 
 ## Notes
 

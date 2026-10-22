@@ -6,7 +6,7 @@ voice cloning.
 
 Write or paste a script, fix pronunciations, pick a 5–10 second reference voice, and F5 Studio
 generates it one paragraph at a time on the Apple GPU, with pause and resume, redoing single lines,
-and a merged MP3 in Downloads at the end.
+and a merged MP3 in `~/f5-tts/exports/<project>/` at the end (with a Show in Finder button).
 
 - **Script**: paste one in (e.g. written with Claude), or pick one written by the Cogitator's
   Scriptorium (a separate local study app; see app/README.md). A fact check flags numbers or citations
@@ -17,8 +17,8 @@ and a merged MP3 in Downloads at the end.
 - **Generate**: a queue that survives restarts. Clips are keyed by their text, so editing one line
   only redoes that line. Lines with an unusual pace get flagged for a listen.
 - **Export**: everything, or only the finished sections, with adjustable pauses. Long projects (over
-  5 hours to generate, adjustable) can optionally be split into parts that save themselves to Downloads
-  as each one finishes.
+  5 hours to generate, adjustable) can optionally be split into parts that save themselves to the exports
+  folder as each one finishes.
 
 Everything stays on the Mac. There are no accounts or paid APIs, and the Hugging Face hub isn't
 contacted after the first model download.

@@ -74,7 +74,7 @@ def get_project(pid: str):
     m = p.meta
     return {
         **p.summary(sections), "script": p.script, "source": p.source, "sections": sections,
-        "pacing": m["pacing"], "quality": m["quality"], "writer": m["writer"], "origin": m.get("origin"), "exports": p.exports(),
+        "pacing": m["pacing"], "quality": m["quality"], "writer": m["writer"], "origin": m.get("origin"), "exports": p.exports(), "export_dir": str(p.export_dir),
         "check": textprep.fact_check(p.source, p.script) if p.source.strip() else None,
         "split": parts.summary(p, sections, engine.WORKER.ratio),
     }
@@ -159,6 +159,15 @@ def set_split(pid: str, body: dict = Body(...)):
     return parts.summary(p, p.sections(), engine.WORKER.ratio)
 
 
+@app.post("/api/projects/{pid}/exports/reveal")
+def reveal_exports(pid: str):
+    """Open the project's exports folder (~/f5-tts/exports/<title>) in Finder, creating it if needed."""
+    p = project_or_404(pid)
+    p.export_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["/usr/bin/open", str(p.export_dir)])
+    return {"path": str(p.export_dir)}
+
+
 @app.post("/api/reveal")
 def reveal(path: str = Body(..., embed=True)):
     f = Path(path).resolve()
@@ -240,15 +249,17 @@ def cogitator_settings(body: dict = Body(...)):
 
 @app.post("/api/cogitator/import")
 def cogitator_import(name: str = Body(...), voice: str = Body(""), generate: bool = Body(False),
-                     project: str = Body("")):
+                     project: str = Body(""), replace: bool = Body(False)):
     if voice:
         voice_or_404(voice)
     if project:
         project_or_404(project)
     try:
-        return inbox.import_script(name, voice or None, generate, project or None)
+        return inbox.import_script(name, voice or None, generate, project or None, replace)
     except FileNotFoundError:
         bad("That script isn't in the Cogitator's folder anymore.", 404)
+    except PermissionError as e:
+        bad(str(e), 409)
     except ValueError as e:
         bad(str(e))
 
