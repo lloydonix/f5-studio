@@ -1,11 +1,11 @@
-"""The Cogitator bridge: tutor scripts written by the Scriptorium (~/study) come into F5 Studio.
+"""The Cogitator bridge: tutor scripts written by the Scriptorium (~/projects/study) come into F5 Studio.
 
-The Scriptorium saves `~/study/scripts/<Voice> Tutor Script - <Subject> - Part N.txt`, appending each
+The Scriptorium saves `~/projects/study/scripts/<Voice> Tutor Script - <Subject> - Part N.txt`, appending each
 section as it's written. A script is ready once the Scriptorium's job no longer lists it as the file in
 progress (its API, 127.0.0.1:8779) and it ends with the closing sign-off. Ready scripts can be imported
 as projects by hand, or automatically (with an optional start of generation).
 
-Read-only toward ~/study: this never writes there.
+Read-only toward ~/projects/study: this never writes there.
 """
 import re, threading, time
 from pathlib import Path
@@ -14,7 +14,7 @@ import httpx
 
 from . import engine, store
 
-SCRIPTS = Path.home() / "study" / "scripts"
+SCRIPTS = Path.home() / "projects" / "study" / "scripts"
 JOB_API = "http://127.0.0.1:8779/scriptorium/api/job"
 SETTINGS = store.STUDIO / "cogitator.json"
 BAR = re.compile(r"^={10,}$")

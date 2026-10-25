@@ -1,6 +1,6 @@
 """F5 Studio backend: a local-only HTTP API plus the UI, on 127.0.0.1.
 
-Run: ~/f5-tts/.venv/bin/python -m studio.server 8799   (from ~/f5-tts/app; run_server.sh does this)
+Run: ~/projects/f5-tts/.venv/bin/python -m studio.server 8799   (from ~/projects/f5-tts/app; run_server.sh does this)
 """
 import os, subprocess, sys, tempfile
 from pathlib import Path
@@ -161,7 +161,7 @@ def set_split(pid: str, body: dict = Body(...)):
 
 @app.post("/api/projects/{pid}/exports/reveal")
 def reveal_exports(pid: str):
-    """Open the project's exports folder (~/f5-tts/exports/<title>) in Finder, creating it if needed."""
+    """Open the project's exports folder (~/projects/f5-tts/exports/<title>) in Finder, creating it if needed."""
     p = project_or_404(pid)
     p.export_dir.mkdir(parents=True, exist_ok=True)
     subprocess.run(["/usr/bin/open", str(p.export_dir)])
@@ -229,7 +229,7 @@ def retranscribe(vid: str):
     return store.save_voice(v)
 
 
-# ---------- the Cogitator (scripts from ~/study's Scriptorium) ----------
+# ---------- the Cogitator (scripts from ~/projects/study's Scriptorium) ----------
 
 @app.get("/api/cogitator")
 def cogitator():

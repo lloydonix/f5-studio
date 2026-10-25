@@ -6,7 +6,7 @@ voice cloning.
 
 Write or paste a script, fix pronunciations, pick a 5–10 second reference voice, and F5 Studio
 generates it one paragraph at a time on the Apple GPU, with pause and resume, redoing single lines,
-and a merged MP3 in `~/f5-tts/exports/<project>/` at the end (with a Show in Finder button).
+and a merged MP3 in `~/projects/f5-tts/exports/<project>/` at the end (with a Show in Finder button).
 
 - **Script**: paste one in (e.g. written with Claude), or pick one written by the Cogitator's
   Scriptorium (a separate local study app; see app/README.md). A fact check flags numbers or citations
@@ -25,11 +25,11 @@ contacted after the first model download.
 
 ## Setup (Apple Silicon, macOS 13+)
 
-The app expects to live at `~/f5-tts`, with F5-TTS installed in `~/f5-tts/.venv`.
+The app expects to live at `~/projects/f5-tts`, with F5-TTS installed in `~/projects/f5-tts/.venv`.
 
 ```bash
-git clone https://github.com/lloydonix/f5-studio.git ~/f5-tts
-cd ~/f5-tts
+git clone https://github.com/lloydonix/f5-studio.git ~/projects/f5-tts
+cd ~/projects/f5-tts
 brew install python@3.11 ffmpeg
 python3.11 -m venv .venv
 .venv/bin/pip install f5-tts

@@ -1,4 +1,4 @@
-"""Projects, voices and the pronunciation list, all stored as plain files under ~/f5-tts.
+"""Projects, voices and the pronunciation list, all stored as plain files under ~/projects/f5-tts.
 
 projects/<id>/project.json   title, voice, persona, pacing, where the script comes from
 projects/<id>/script.txt     the script as written
@@ -14,7 +14,7 @@ import soundfile as sf
 
 from . import textprep
 
-ROOT = Path.home() / "f5-tts"
+ROOT = Path.home() / "projects" / "f5-tts"
 PROJECTS = ROOT / "projects"
 STUDIO = ROOT / "studio"
 VOICES = STUDIO / "voices"

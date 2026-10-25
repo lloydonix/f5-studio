@@ -1,4 +1,4 @@
-"""Merge a project's paragraph clips into one file in ~/f5-tts/exports/<project title>/."""
+"""Merge a project's paragraph clips into one file in ~/projects/f5-tts/exports/<project title>/."""
 import re, subprocess, time
 from pathlib import Path
 

@@ -7,8 +7,8 @@ let home = FileManager.default.homeDirectoryForCurrentUser.path
 let port = 8799
 let startURL = URL(string: "http://127.0.0.1:\(port)/app/ui/index.html?app=1")!
 let apiURL = URL(string: "http://127.0.0.1:\(port)/api/state")!
-let serverScript = "\(home)/f5-tts/app/run_server.sh"
-let logPath = "\(home)/f5-tts/app/server.log"
+let serverScript = "\(home)/projects/f5-tts/app/run_server.sh"
+let logPath = "\(home)/projects/f5-tts/app/server.log"
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate {
     var window: NSWindow!
@@ -177,7 +177,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
         p.arguments = [serverScript, String(port)]
-        p.currentDirectoryURL = URL(fileURLWithPath: "\(home)/f5-tts")
+        p.currentDirectoryURL = URL(fileURLWithPath: "\(home)/projects/f5-tts")
         if !FileManager.default.fileExists(atPath: logPath) { FileManager.default.createFile(atPath: logPath, contents: nil) }
         if let log = FileHandle(forWritingAtPath: logPath) {
             log.seekToEndOfFile()
@@ -210,7 +210,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     // MARK: menus
 
     @objc func reload() { web.reload() }
-    @objc func openFolder() { NSWorkspace.shared.open(URL(fileURLWithPath: "\(home)/f5-tts")) }
+    @objc func openFolder() { NSWorkspace.shared.open(URL(fileURLWithPath: "\(home)/projects/f5-tts")) }
 
     func buildMenu() {
         let main = NSMenu()

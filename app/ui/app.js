@@ -164,7 +164,7 @@
   function cogPickerHTML(p) {
     const c = S.cog;
     if (!c) return '<p class="small muted" style="margin:14px 0 0">Looking for the Cogitator…</p>';
-    if (!c.available) return `<p class="small muted" style="margin:14px 0 0">The Cogitator's scripts folder (~/study/scripts) isn't there yet.</p>`;
+    if (!c.available) return `<p class="small muted" style="margin:14px 0 0">The Cogitator's scripts folder (~/projects/study/scripts) isn't there yet.</p>`;
     const linked = p.origin?.cogitator, li = c.items.find(i => i.name === linked);
     const ready = c.items.filter(i => i.state !== "writing");
     const protect = !linked && (p.done > 0 || p.script.trim());   // don't swap scripts in a project that has its own
@@ -745,7 +745,7 @@
         <span class="d">Uses the format and quality set on the right.</span></span></label></div>`;
   }
 
-  /* ---------- the Cogitator (Scriptorium scripts from ~/study) ---------- */
+  /* ---------- the Cogitator (Scriptorium scripts from ~/projects/study) ---------- */
   const COG_TAG = { writing: "writing…", ready: "new", incomplete: "incomplete" };
   function cogStatus(it) {
     if (it.state === "writing") {
