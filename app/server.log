@@ -1,0 +1,42 @@
+
+--- starting 2026-10-20 15:37:14 +0000
+
+--- starting 2026-10-20 15:37:19 +0000
+
+--- starting 2026-10-20 15:38:13 +0000
+
+--- starting 2026-10-20 15:38:14 +0000
+
+--- starting 2026-10-20 15:38:22 +0000
+
+--- starting 2026-10-20 15:38:30 +0000
+
+--- starting 2026-10-20 15:38:45 +0000
+
+--- starting 2026-10-20 16:07:40 +0000
+
+--- starting 2026-10-20 16:10:23 +0000
+
+--- starting 2026-10-20 16:27:38 +0000
+W1021 00:30:13.885000 37753 torch/distributed/elastic/multiprocessing/redirects.py:35] NOTE: Redirects are currently not supported in MacOs.
+/Users/leolloydcatalan/f5-tts/.venv/lib/python3.11/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+
+--- starting 2026-10-20 16:30:21 +0000
+ERROR:    [Errno 48] error while attempting to bind on address ('127.0.0.1', 8799): address already in use
+
+--- starting 2026-10-21 13:19:28 +0000
+
+--- starting 2026-10-21 18:47:53 +0000
+
+--- starting 2026-10-22 02:20:48 +0000
+
+--- starting 2026-10-22 06:52:36 +0000
+
+--- starting 2026-10-22 07:00:03 +0000
+
+--- starting 2026-10-22 07:02:36 +0000
+
+--- starting 2026-10-23 09:01:25 +0000
+
+--- starting 2026-11-05 12:10:43 +0000

@@ -1,0 +1,22 @@
+{
+ "title": "Persons and Family Law · Cheat Sheet",
+ "voice": "vivian",
+ "persona": "Shadowheart",
+ "created": 1792651788.2741718,
+ "updated": 1792651788.275049,
+ "pacing": {
+  "para": 0.45,
+  "heading": 0.7,
+  "section": 1.3
+ },
+ "order": 100,
+ "quality": "best",
+ "writer": {
+  "mode": "paste"
+ },
+ "origin": {
+  "cogitator": "Shadowheart Tutor Script - Persons and Family Law - Cheat Sheet.txt",
+  "mtime": 1792598314.2039623,
+  "imported": 1792651788.275019
+ }
+}

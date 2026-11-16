@@ -1,0 +1,418 @@
+[
+ {
+  "term": " kaayo,\"",
+  "say": ",\""
+ },
+ {
+  "term": "stare decisis et non quieta movere",
+  "say": "star-ay deh-sigh-sis et non kwee-ay-tah moh-veh-ray"
+ },
+ {
+  "term": "Stare decisis et non quieta movere",
+  "say": "Star-ay deh-sigh-sis et non kwee-ay-tah moh-veh-ray"
+ },
+ {
+  "term": "STARE DECISIS",
+  "say": "Star-ay deh-sigh-sis"
+ },
+ {
+  "term": "Stare decisis",
+  "say": "Star-ay deh-sigh-sis"
+ },
+ {
+  "term": "stare decisis",
+  "say": "star-ay deh-sigh-sis"
+ },
+ {
+  "term": "ratio decidendi",
+  "say": "rah-shee-oh deh-sih-den-dye"
+ },
+ {
+  "term": "Obiter dictum",
+  "say": "Oh-bih-ter dik-tum"
+ },
+ {
+  "term": "obiter",
+  "say": "oh-bih-ter"
+ },
+ {
+  "term": "Pro hac vice",
+  "say": "Pro hahk vee-chay"
+ },
+ {
+  "term": "en banc",
+  "say": "on bonk"
+ },
+ {
+  "term": "ad litem",
+  "say": "ad lye-tem"
+ },
+ {
+  "term": "litis pendentia",
+  "say": "lee-tiss pen-den-sha"
+ },
+ {
+  "term": "Res judicata",
+  "say": "Rays joo-dih-kah-tah"
+ },
+ {
+  "term": "res judicata",
+  "say": "rays joo-dih-kah-tah"
+ },
+ {
+  "term": "THIRD-PARTY CLAIM (TERCERIA)",
+  "say": "Third-party claim, or ter-seh-ree-ah"
+ },
+ {
+  "term": "Terceria",
+  "say": "Ter-seh-ree-ah"
+ },
+ {
+  "term": "force majeure",
+  "say": "force mah-zhur"
+ },
+ {
+  "term": "certiorari",
+  "say": "ser-shee-oh-rah-ree"
+ },
+ {
+  "term": "Lae'zel",
+  "say": "Lay-zel"
+ },
+ {
+  "term": "Neypes",
+  "say": "Nay-pes"
+ },
+ {
+  "term": "Tijam",
+  "say": "Tee-hahm"
+ },
+ {
+  "term": "Gabrillo",
+  "say": "Gah-bree-yo"
+ },
+ {
+  "term": "carabaos",
+  "say": "kara-bows"
+ },
+ {
+  "term": "Davao",
+  "say": "Dah-vow"
+ },
+ {
+  "term": "tenday",
+  "say": "ten-day"
+ },
+ {
+  "term": "FAME-N",
+  "say": "Fame N"
+ },
+ {
+  "term": "on LED",
+  "say": "on L-E-D"
+ },
+ {
+  "term": "against LED",
+  "say": "against L-E-D"
+ },
+ {
+  "term": "JBE",
+  "say": "J-B-E"
+ },
+ {
+  "term": "TRO",
+  "say": "T-R-O"
+ },
+ {
+  "term": "RTC",
+  "say": "R-T-C"
+ },
+ {
+  "term": "MTC",
+  "say": "M-T-C"
+ },
+ {
+  "term": "G.R. No. 174414",
+  "say": "G-R number one seven four, four one four"
+ },
+ {
+  "term": "G.R. No. 234255",
+  "say": "G-R number two three four, two five five"
+ },
+ {
+  "term": "G.R. No. 221062",
+  "say": "G-R number two two one, zero six two"
+ },
+ {
+  "term": "OCA Circular 96-2009",
+  "say": "O-C-A Circular ninety-six, two thousand nine"
+ },
+ {
+  "term": "BP 129",
+  "say": "B-P one twenty-nine"
+ },
+ {
+  "term": "RA 11576",
+  "say": "R-A eleven five seventy-six"
+ },
+ {
+  "term": "Section 5(b)",
+  "say": "Section five B"
+ },
+ {
+  "term": "Section 3(b)",
+  "say": "Section three B"
+ },
+ {
+  "term": "accion publiciana",
+  "say": "ak-see-on poo-blee-see-ah-nah"
+ },
+ {
+  "term": "ACCION PUBLICIANA",
+  "say": "ak-see-on poo-blee-see-ah-nah"
+ },
+ {
+  "term": "accion reivindicatoria",
+  "say": "ak-see-on ray-vin-dee-kah-tor-ya"
+ },
+ {
+  "term": "ACCION REIVINDICATORIA",
+  "say": "ak-see-on ray-vin-dee-kah-tor-ya"
+ },
+ {
+  "term": "Accion publiciana",
+  "say": "Ak-see-on poo-blee-see-ah-nah"
+ },
+ {
+  "term": "Accion reivindicatoria",
+  "say": "Ak-see-on ray-vin-dee-kah-tor-ya"
+ },
+ {
+  "term": "SIBONGHANOY",
+  "say": "See-bong-hah-noy"
+ },
+ {
+  "term": "Sibonghanoy",
+  "say": "See-bong-hah-noy"
+ },
+ {
+  "term": "TIJAM",
+  "say": "Tee-hahm"
+ },
+ {
+  "term": "GABRILLO",
+  "say": "Gah-bree-yo"
+ },
+ {
+  "term": "SY-VARGAS",
+  "say": "See Vargas"
+ },
+ {
+  "term": "Sy-Vargas",
+  "say": "See Vargas"
+ },
+ {
+  "term": "OGSOS",
+  "say": "Og-sos"
+ },
+ {
+  "term": "Ogsos",
+  "say": "Og-sos"
+ },
+ {
+  "term": "Foronda-Crystal",
+  "say": "Foh-ron-dah Crystal"
+ },
+ {
+  "term": "Briones",
+  "say": "Bree-oh-nes"
+ },
+ {
+  "term": "Dumaguete",
+  "say": "Doo-mah-geh-teh"
+ },
+ {
+  "term": "Makati",
+  "say": "Mah-kah-tee"
+ },
+ {
+  "term": "Cebu",
+  "say": "Seh-boo"
+ },
+ {
+  "term": "barangay",
+  "say": "bah-rang-guy"
+ },
+ {
+  "term": "ex parte",
+  "say": "ex par-tay"
+ },
+ {
+  "term": "Z-Notes",
+  "say": "Zee Notes"
+ },
+ {
+  "term": "CFI",
+  "say": "C-F-I"
+ },
+ {
+  "term": "no MR,",
+  "say": "no M-R,"
+ },
+ {
+  "term": "is FEC",
+  "say": "is F-E-C"
+ },
+ {
+  "term": "performance AND payment",
+  "say": "performance and payment"
+ },
+ {
+  "term": "performance OR payment",
+  "say": "performance or payment"
+ },
+ {
+  "term": "A.M. No. 03-1-09-SC",
+  "say": "A-M number zero three, one, zero nine, S-C"
+ },
+ {
+  "term": "G.R. No. 141524",
+  "say": "G-R number one four one, five two four"
+ },
+ {
+  "term": "Article VIII",
+  "say": "Article eight"
+ },
+ {
+  "term": "Section 47(a)",
+  "say": "Section forty-seven A"
+ },
+ {
+  "term": "reclusion perpetua",
+  "say": "reh-kloo-see-on per-peh-twa"
+ },
+ {
+  "term": "ad testificandum",
+  "say": "ad tes-tih-fih-kan-dum"
+ },
+ {
+  "term": "duces tecum",
+  "say": "doo-ses tay-kum"
+ },
+ {
+  "term": "DUCES TECUM",
+  "say": "doo-ses tay-kum"
+ },
+ {
+  "term": "nunc pro tunc",
+  "say": "noonk pro toonk"
+ },
+ {
+  "term": "Nunc pro tunc",
+  "say": "Noonk pro toonk"
+ },
+ {
+  "term": "sin perjuicio",
+  "say": "sin pair-hwee-see-oh"
+ },
+ {
+  "term": "Sin perjuicio",
+  "say": "Sin pair-hwee-see-oh"
+ },
+ {
+  "term": "motu proprio",
+  "say": "moh-too proh-pree-oh"
+ },
+ {
+  "term": "supersedeas",
+  "say": "soo-per-see-dee-as"
+ },
+ {
+  "term": "prima facie",
+  "say": "pry-mah fay-shee"
+ },
+ {
+  "term": "habeas corpus",
+  "say": "hay-bee-as kor-pus"
+ },
+ {
+  "term": "mandamus",
+  "say": "man-day-mus"
+ },
+ {
+  "term": "fallo",
+  "say": "fah-yo"
+ },
+ {
+  "term": "Daradar",
+  "say": "Dah-rah-dar"
+ },
+ {
+  "term": "Shimizu",
+  "say": "Shee-mee-zoo"
+ },
+ {
+  "term": "Sabarte",
+  "say": "Sah-bar-teh"
+ },
+ {
+  "term": "Bujac",
+  "say": "Boo-hak"
+ },
+ {
+  "term": "Rigos",
+  "say": "Ree-gos"
+ },
+ {
+  "term": "viatory",
+  "say": "vy-ah-tory"
+ },
+ {
+  "term": "VIATORY",
+  "say": "vy-ah-tory"
+ },
+ {
+  "term": "WaSSP",
+  "say": "wasp"
+ },
+ {
+  "term": "Selûne",
+  "say": "Seh-loon"
+ },
+ {
+  "term": "githyanki",
+  "say": "gith-yan-kee"
+ },
+ {
+  "term": "FAME N",
+  "say": "Fame N"
+ },
+ {
+  "term": " V. ",
+  "say": " versus "
+ },
+ {
+  "term": " v. ",
+  "say": " versus "
+ },
+ {
+  "term": " v. Court",
+  "say": " versus Court"
+ },
+ {
+  "term": " VS. ",
+  "say": " versus "
+ },
+ {
+  "term": " vs. ",
+  "say": " versus "
+ },
+ {
+  "term": "one-point-eight-million-peso",
+  "say": "one point eight million peso"
+ },
+ {
+  "term": "5- and 10-year",
+  "say": "five and ten year"
+ }
+]

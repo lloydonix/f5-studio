@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "f5-studio-dev",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": ["/Users/leolloydcatalan/projects/f5-tts/app/run_server.sh", "8798"],
+      "port": 8798
+    }
+  ]
+}
