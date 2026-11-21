@@ -1,18 +1,18 @@
 # F5 Studio
 
-A personal, fully offline Mac app for turning long scripts (study reviewers, lecture notes,
-character-voiced tutoring scripts) into long-form audio with [F5-TTS](https://github.com/SWivid/F5-TTS)
-voice cloning.
+A personal, fully offline Mac app for turning text into long-form audio with
+[F5-TTS](https://github.com/SWivid/F5-TTS) voice cloning: someone reading a book or an excerpt,
+character dialogue, notes, anything you can paste.
 
-Write or paste a script, fix pronunciations, pick a 5–10 second reference voice, and F5 Studio
+Paste or open a script, fix pronunciations, pick a 5–10 second reference voice, and F5 Studio
 generates it one paragraph at a time on the Apple GPU, with pause and resume, redoing single lines,
 and a merged MP3 in `~/projects/f5-tts/exports/<project>/` at the end (with a Show in Finder button).
 
-- **Script**: paste one in (e.g. written with Claude), or pick one written by the Cogitator's
-  Scriptorium (a separate local study app; see app/README.md). A fact check flags numbers or citations
-  that went missing compared to the source.
-- **Pronunciation**: a shared find-and-replace list (Latin terms, names, acronyms), plus numbers
-  turned into words, before anything is spoken.
+- **Script**: paste text or open a .txt / .md file. Each line is one paragraph; a line starting with
+  `#` is a chapter or section heading. An optional "Compare with the original" check flags numbers or
+  headings that went missing when the text was adapted from something else.
+- **Pronunciation**: find-and-replace lists (names, made-up words) and acronyms to spell out, plus
+  numbers turned into words, before anything is spoken. Each project picks which lists it uses.
 - **Voice**: drop in a clip; it's trimmed, converted to 24 kHz and transcribed with Whisper.
 - **Generate**: a queue that survives restarts. Clips are keyed by their text, so editing one line
   only redoes that line. Lines with an unusual pace get flagged for a listen.

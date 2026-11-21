@@ -21,7 +21,7 @@
   };
 
   const S = {
-    overview: null, project: null, prons: null, models: null,
+    overview: null, project: null, lists: null, editList: null, models: null,
     pid: null, step: "generate",
     filter: "all", playing: null, scriptDirty: false, sourceDirty: false,
     exportOpts: { format: "mp3", quality: "high", name: "" },
@@ -120,7 +120,7 @@
       </button>`).join("") || '<div class="small muted" style="padding:8px">No projects yet.</div>';
     if (S.cog) renderCog();
     $("#voiceCount").textContent = o.voices.length;
-    $("#pronCount").textContent = o.pronunciations;
+    $("#pronCount").textContent = o.pron_lists.length;
     const busy = w.running;
     $(".engine .dot").className = "dot " + (w.error ? "dot-warn" : busy ? "dot-busy" : "dot-ok");
     $(".engine-sub").textContent = w.error ? "Stopped with an error"
@@ -145,7 +145,7 @@
     const v = voiceById(p.voice);
     $("#projMeta").innerHTML = `
       <span>Voice <b>${esc(v?.name || "none")}</b></span>
-      ${p.persona ? `<span>Persona <b>${esc(p.persona)}</b></span>` : ""}
+      ${p.persona ? `<span>Read as <b>${esc(p.persona)}</b></span>` : ""}
       <span><b>${p.words.toLocaleString()}</b> words</span>
       <span><b>${fmtDur(done ? p.audio : p.words / 150 * 60)}</b> ${done ? "of audio" : "estimated audio"}</span>`;
     $$(".step").forEach(b => b.classList.toggle("active", b.dataset.step === S.step));
@@ -153,12 +153,12 @@
 
   /* ---------- 1. script ---------- */
   function checkHTML(c) {
-    if (!c) return '<p class="small muted" style="margin:0">Paste your original notes under <b>Source notes</b> and this checks that no numbers or citations got lost.</p>';
+    if (!c) return '<p class="small muted" style="margin:0">Paste the original text this script was adapted from, and this checks that no numbers or headings got lost.</p>';
     const row = (ok, txt) => `<li><span class="${ok ? "ok" : "warn"}">${ok ? I.check : I.warn}</span><span>${txt}</span></li>`;
     return `<ul class="check-list">
       ${row(!c.numbers_missing.length, c.numbers_missing.length ? `<b>${c.numbers_missing.length}</b> numbers missing: ${esc(c.numbers_missing.slice(0, 12).join(", "))}` : `All <b>${c.numbers}</b> numbers kept`)}
-      ${row(!c.citations_missing.length, c.citations_missing.length ? `Missing citations: ${esc(c.citations_missing.slice(0, 6).join("; "))}` : `All <b>${c.citations}</b> citations kept`)}
-      ${row(c.headings_script >= c.headings_source, `${c.headings_script} of ${c.headings_source} headings`)}
+      ${c.citations ? row(!c.citations_missing.length, c.citations_missing.length ? `Missing citations: ${esc(c.citations_missing.slice(0, 6).join("; "))}` : `All <b>${c.citations}</b> citations kept`) : ""}
+      ${c.headings_source ? row(c.headings_script >= c.headings_source, `${c.headings_script} of ${c.headings_source} headings`) : ""}
     </ul>`;
   }
   function cogPickerHTML(p) {
@@ -187,51 +187,53 @@
         <span class="small muted">Write it in the Scriptorium (Workspace → Scriptorium), then pick it above.</span></div>`;
   }
   function renderScript() {
-    const p = S.project, mode = p.writer?.mode === "cogitator" ? "cogitator" : "paste", est = p.words / 150 * 60;
+    const cogOn = S.overview.cogitator;
+    const p = S.project, mode = cogOn && p.writer?.mode === "cogitator" ? "cogitator" : "paste", est = p.words / 150 * 60;
     $("#view-script").innerHTML = `
       <div class="grid-side">
         <div class="stack">
-          <div class="card">
+          ${cogOn ? `<div class="card">
             <div class="card-head"><div><div class="card-title">Who writes the script</div>
               <div class="card-sub">Both are free. You can switch any time; the rest of the app works the same.</div></div></div>
             <div class="card-pad">
               <div class="seg" id="writerSeg">
-                <button data-mode="paste" class="${mode === "paste" ? "on" : ""}">Paste from Claude</button>
+                <button data-mode="paste" class="${mode === "paste" ? "on" : ""}">Paste or open a file</button>
                 <button data-mode="cogitator" class="${mode === "cogitator" ? "on" : ""}">The Cogitator</button>
               </div>
               <p class="small muted" style="margin:12px 0 0">${mode === "paste"
-                ? "Ask Claude for the script in chat, then paste it below. Best quality, and free with your Claude plan."
+                ? "Paste any text below: a book excerpt, a script, dialogue."
                 : "The Cogitator's Scriptorium writes it from your reviewer and the notes it links to, in the character you choose. Pick a finished script to put it in this project. If it's rewritten later, this project shows it as updated."}</p>
               ${mode === "cogitator" ? `<div id="cogPicker">${cogPickerHTML(p)}</div>` : ""}
             </div>
-          </div>
+          </div>` : ""}
 
           <div class="card">
             <div class="card-head">
-              <div><div class="card-title">Script</div><div class="card-sub">Headings go between ===== or ----- lines. Each line becomes one paragraph.</div></div>
+              <div><div class="card-title">Script</div><div class="card-sub">Each line is read as one paragraph. Start a line with # to make it a chapter or section heading.</div></div>
               <div class="row"><span class="saved-note" id="scriptNote">Saved</span>
-                <button class="btn" id="openTxt">${I.upload}Open .txt</button>
+                <button class="btn" id="openTxt">${I.upload}Open file</button>
                 <button class="btn btn-primary" id="saveScript">${I.save}Save</button></div>
             </div>
-            <div class="card-pad"><textarea class="editor" id="scriptBox" spellcheck="false" placeholder="Paste the script here.">${esc(p.script)}</textarea></div>
+            <div class="card-pad"><textarea class="editor" id="scriptBox" spellcheck="false" placeholder="Paste a book excerpt, a script or dialogue here.&#10;&#10;# Chapter One&#10;The first paragraph goes on its own line.">${esc(p.script)}</textarea></div>
           </div>
 
-          <div class="card">
-            <div class="card-head">
-              <div><div class="card-title">Source notes</div><div class="card-sub">Your original reviewer, for the fact check.</div></div>
+          <details class="card" id="compareCard" ${p.source.trim() ? "open" : ""}>
+            <summary class="card-head" style="cursor:pointer">
+              <div><div class="card-title">Compare with the original <span class="small muted" style="font-weight:400">· optional</span></div>
+                <div class="card-sub">If the script was adapted or summarized from something, paste the original to check nothing got lost.</div></div>
               <div class="row"><span class="saved-note" id="sourceNote">Saved</span><button class="btn" id="saveSource">${I.save}Save</button></div>
-            </div>
-            <div class="card-pad"><textarea id="sourceBox" rows="8" spellcheck="false" placeholder="Paste the original notes here.">${esc(p.source)}</textarea></div>
-          </div>
+            </summary>
+            <div class="card-pad"><textarea id="sourceBox" rows="8" spellcheck="false" placeholder="Paste the original text here.">${esc(p.source)}</textarea>
+              <div id="checkBox" style="margin-top:12px">${checkHTML(p.check)}</div></div>
+          </details>
         </div>
 
         <div class="stack">
           <div class="card card-pad">
-            <div class="card-title" style="margin-bottom:12px">Persona</div>
-            <label class="label">Name shown on the project</label>
-            <input type="text" id="personaName" value="${esc(p.persona)}" placeholder="e.g. Shadowheart (dom)">
+            <div class="card-title" style="margin-bottom:12px">Narrator or character</div>
+            <label class="label">Shown on the project (optional)</label>
+            <input type="text" id="personaName" value="${esc(p.persona)}" placeholder="e.g. Narrator">
           </div>
-          <div class="card card-pad"><div class="card-title" style="margin-bottom:10px">Fact check against source</div><div id="checkBox">${checkHTML(p.check)}</div></div>
           <div class="card card-pad">
             <div class="card-title" style="margin-bottom:10px">Estimate</div>
             <div class="voice-stats" style="grid-template-columns:1fr 1fr">
@@ -246,9 +248,10 @@
     sBox.oninput = () => { S.scriptDirty = true; $("#scriptNote").textContent = "Unsaved"; $("#scriptNote").classList.add("dirty"); };
     srcBox.oninput = () => { S.sourceDirty = true; $("#sourceNote").textContent = "Unsaved"; $("#sourceNote").classList.add("dirty"); };
     $("#saveScript").onclick = attempt(saveScript);
-    $("#saveSource").onclick = attempt(saveSource);
+    $("#saveSource").onclick = e => { e.preventDefault(); attempt(saveSource)(); };
     $("#openTxt").onclick = () => $("#pickScript").click();
     $$("#writerSeg button").forEach(b => b.onclick = attempt(async () => {
+      if (!S.overview.cogitator) return;
       if (S.scriptDirty || S.sourceDirty) return toast("Save your text first.");
       p.writer = { ...p.writer, mode: b.dataset.mode };
       await api("PUT", `/api/projects/${p.id}/settings`, { writer: p.writer });
@@ -305,83 +308,143 @@
   };
 
   /* ---------- 2. pronunciation ---------- */
+  // Pronunciation lists live in the library; each project picks which ones apply to it.
   const shown = r => r.say.match(/\w/) ? r : { ...r, term: r.term.replace(/[^\w' -]/g, "").trim(), say: "(removed)" };
-  const AUTO = "JDR ADR SPA MR MRS SC PNB IRAS LED FEC RTC MTC TRO".split(" ");
+  const curList = () => S.lists.find(l => l.id === S.editList) || S.lists[0];
+  const projLists = () => S.project?.pron_lists || [];
   function suggestions() {
     if (!S.project) return [];
-    const known = new Set(S.prons.map(r => r.term.trim().toLowerCase()));
-    AUTO.forEach(a => known.add(a.toLowerCase()));
-    const skip = new Set("RULE PART AND THE OF VS II III IV PURE FAME CAP DEW JDN CIVIL TO ON BY OR IN NO AN AT IS IT".split(" "));
+    const known = new Set();
+    S.lists.filter(l => projLists().includes(l.id)).forEach(l => {
+      l.terms.forEach(r => known.add(r.term.trim().toLowerCase()));
+      l.acronyms.forEach(a => known.add(a.toLowerCase()));
+    });
+    const skip = new Set("I II III IV VI VII VIII IX XI XII OK TV AND THE OF VS TO ON BY OR IN NO AN AT IS IT A AM PM".split(" "));
     const prose = S.project.script.split("\n").filter(l => /[a-z]/.test(l)).join("\n");
-    const found = new Set();
-    (prose.match(/\b[A-Z]{2,5}\b/g) || []).forEach(a => { if (!known.has(a.toLowerCase()) && !skip.has(a)) found.add(a); });
-    return [...found].slice(0, 8).map(a => ({ term: a, say: a.split("").join("-") }));
+    // An acronym sits among ordinary words; a run of capitals ("WHAT SHE SAID") is emphasis or shouting.
+    const found = new Set(), caps = w => /^[A-Z]{2,}$/.test(w);
+    prose.split("\n").forEach(line => {
+      const ws = line.match(/[A-Za-z]+/g) || [];
+      ws.forEach((a, i) => {
+        if (a.length > 5 || !caps(a) || caps(ws[i - 1] || "") || caps(ws[i + 1] || "")) return;
+        if (!known.has(a.toLowerCase()) && !skip.has(a)) found.add(a);
+      });
+    });
+    return [...found].slice(0, 8);
   }
+  async function loadLists() { S.lists = await api("GET", "/api/pronlists"); }
   async function renderPron(q = "") {
-    if (!S.prons) S.prons = await api("GET", "/api/pronunciations");
-    const rows = S.prons.map((r, i) => ({ ...shown(r), i })).filter(r => !q || (r.term + r.say).toLowerCase().includes(q.toLowerCase()));
+    if (!S.lists) await loadLists();
+    if (!S.editList || !S.lists.some(l => l.id === S.editList)) S.editList = projLists()[0] || "general";
+    const L = curList(), used = projLists();
+    const rows = L.terms.map((r, i) => ({ ...shown(r), i })).filter(r => !q || (r.term + r.say).toLowerCase().includes(q.toLowerCase()));
     const sug = suggestions(), v = voiceById(S.project?.voice);
     $("#view-pron").innerHTML = `
       <div class="grid-side">
-        <div class="card">
-          <div class="card-head">
-            <div><div class="card-title">Pronunciation list</div><div class="card-sub">Shared by every project. Changes apply to paragraphs not generated yet.</div></div>
-            <div class="row" style="flex-wrap:nowrap">
-              <input type="search" id="pronSearch" placeholder="Search ${S.prons.length} terms" value="${esc(q)}" style="width:210px">
-              <button class="btn" id="addTerm">${I.plus}Add</button></div>
+        <div class="stack">
+          <div class="card">
+            <div class="card-head">
+              <div><div class="row" style="flex-wrap:nowrap;gap:8px"><select id="listSel" style="width:auto;font-weight:600">${S.lists.map(l =>
+                  `<option value="${esc(l.id)}" ${l.id === L.id ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select>
+                  ${S.project ? (used.includes(L.id) ? '<span class="tag tag-imported">used here</span>' : '<span class="tag tag-incomplete">not used here</span>') : ""}</div>
+                <div class="card-sub" style="margin-top:6px">${L.terms.length} terms · ${L.acronyms.length} acronyms. Changes apply to paragraphs not generated yet.</div></div>
+              <div class="row" style="flex-wrap:nowrap">
+                <input type="search" id="pronSearch" placeholder="Search" value="${esc(q)}" style="width:150px">
+                <button class="btn" id="addTerm">${I.plus}Add</button>
+                <button class="btn btn-ghost" id="listMore" title="Rename, delete or start a new list">More…</button></div>
+            </div>
+            <div class="pron-scroll"><table class="pron-table">
+              <thead><tr><th style="width:40%">Written</th><th>Spoken as</th><th style="width:76px"></th></tr></thead>
+              <tbody>${rows.map(r => `<tr><td class="term">${esc(r.term)}</td>
+                <td>${r.say === "(removed)" ? '<span class="muted small" style="padding-left:8px">(removed)</span>' : `<input type="text" data-say="${r.i}" value="${esc(r.say)}">`}</td>
+                <td><div class="row" style="gap:0;flex-wrap:nowrap">
+                  <button class="icon-btn" title="Hear it" data-hear="${r.i}" ${v ? "" : "disabled"}>${I.play}</button>
+                  <button class="icon-btn" title="Remove" data-del="${r.i}">${I.trash}</button></div></td></tr>`).join("")
+                || `<tr><td colspan="3" class="small muted" style="padding:14px">${q ? "No matches." : "No terms yet. Add names, made-up words or anything F5 says wrong."}</td></tr>`}</tbody>
+            </table></div>
           </div>
-          <div class="pron-scroll"><table class="pron-table">
-            <thead><tr><th style="width:40%">Written</th><th>Spoken as</th><th style="width:76px"></th></tr></thead>
-            <tbody>${rows.map(r => `<tr><td class="term">${esc(r.term)}</td>
-              <td>${r.say === "(removed)" ? '<span class="muted small" style="padding-left:8px">(removed)</span>' : `<input type="text" data-say="${r.i}" value="${esc(r.say)}">`}</td>
-              <td><div class="row" style="gap:0;flex-wrap:nowrap">
-                <button class="icon-btn" title="Hear it" data-hear="${r.i}" ${v ? "" : "disabled"}>${I.play}</button>
-                <button class="icon-btn" title="Remove" data-del="${r.i}">${I.trash}</button></div></td></tr>`).join("")}</tbody>
-          </table></div>
+          <div class="card card-pad">
+            <div class="card-title">Acronyms in ${esc(L.name)}</div>
+            <div class="card-sub" style="margin-bottom:10px">Spelled out letter by letter, e.g. FBI → F-B-I. Separate with commas.</div>
+            <input type="text" id="acrBox" value="${esc(L.acronyms.join(", "))}" placeholder="e.g. FBI, NASA, CEO">
+          </div>
         </div>
         <div class="stack">
-          <div class="card card-pad">
-            <div class="card-title">New terms in this script</div>
-            <div class="card-sub" style="margin-bottom:6px">Acronyms the list doesn't cover yet.</div>
-            ${sug.length ? sug.map(s => `<div class="suggest"><b style="min-width:52px">${esc(s.term)}</b><span class="muted small">→ ${esc(s.say)}</span>
-              <span class="spacer"></span><button class="btn" data-addsug="${esc(s.term)}|${esc(s.say)}">Add</button></div>`).join("")
-              : '<p class="small muted">Nothing new. Every acronym is covered.</p>'}
-          </div>
+          ${S.project ? `<div class="card card-pad">
+            <div class="card-title">Lists this project uses</div>
+            <div class="card-sub" style="margin-bottom:8px">Earlier lists win when two disagree.</div>
+            ${S.lists.map(l => `<label class="toggle" style="margin:6px 0"><input type="checkbox" data-uselist="${esc(l.id)}" ${used.includes(l.id) ? "checked" : ""}>
+              <span class="sw"></span><span><span class="t">${esc(l.name)}</span><br><span class="d">${l.terms.length} terms · ${l.acronyms.length} acronyms</span></span></label>`).join("")}
+          </div>` : ""}
+          ${S.project ? `<div class="card card-pad">
+            <div class="card-title">Acronyms in this script</div>
+            <div class="card-sub" style="margin-bottom:6px">Capitalized words the lists don't cover yet. Adding one puts it in ${esc(L.name)}.</div>
+            ${sug.length ? sug.map(a => `<div class="suggest"><b style="min-width:52px">${esc(a)}</b><span class="muted small">→ ${esc(a.split("").join("-"))}</span>
+              <span class="spacer"></span><button class="btn" data-addsug="${esc(a)}">Spell out</button></div>`).join("")
+              : '<p class="small muted">Nothing new.</p>'}
+          </div>` : ""}
           <div class="card card-pad">
             <div class="card-title" style="margin-bottom:10px">Test a line</div>
-            <textarea rows="3" id="testLine">Under Rule 39, the writ must follow the fallo, and a supersedeas bond stays discretionary execution.</textarea>
+            <textarea rows="3" id="testLine">In 1998, Siobhan read chapter 12 aloud to the NASA crew.</textarea>
             <div class="small muted" id="testSpoken" style="margin-top:8px"></div>
-            <div class="row" style="margin-top:10px"><span class="small muted">${v ? `In ${esc(v.name)}'s voice` : "Pick a voice first"}</span><span class="spacer"></span>
+            <div class="row" style="margin-top:10px"><span class="small muted">${v ? `In ${esc(v.name)}'s voice, with this project's lists` : "Pick a voice first"}</span><span class="spacer"></span>
               <button class="btn btn-primary" id="speakBtn" ${v ? "" : "disabled"}>${I.play}Speak it</button></div>
           </div>
         </div>
       </div>`;
     const s = $("#pronSearch");
     s.oninput = () => { const pos = s.selectionStart; renderPron(s.value).then(() => { const n = $("#pronSearch"); n.focus(); n.setSelectionRange(pos, pos); }); };
+    $("#listSel").onchange = e => { S.editList = e.target.value; renderPron(); };
     $("#addTerm").onclick = attempt(async () => {
-      const r = await modal("Add a pronunciation", `
-        <div><label class="label">Written as</label><input type="text" name="term" required placeholder="e.g. habeas data"></div>
-        <div><label class="label">Spoken as</label><input type="text" name="say" required placeholder="e.g. hay-bee-as day-ta"></div>`, "Add");
-      if (r && r.term.trim() && r.say.trim()) await savePron([...S.prons, { term: r.term.trim(), say: r.say.trim() }], `Added ${r.term.trim()}.`);
+      const r = await modal(`Add to ${L.name}`, `
+        <div><label class="label">Written as</label><input type="text" name="term" required placeholder="e.g. Siobhan"></div>
+        <div><label class="label">Spoken as</label><input type="text" name="say" required placeholder="e.g. shiv-awn"></div>`, "Add");
+      if (r && r.term.trim() && r.say.trim()) await saveList({ terms: [...L.terms, { term: r.term.trim(), say: r.say.trim() }] }, `Added ${r.term.trim()}.`);
     });
+    $("#listMore").onclick = attempt(listMenu);
     $$("[data-say]").forEach(inp => inp.onchange = attempt(() => {
-      const next = S.prons.slice(); next[+inp.dataset.say] = { ...next[+inp.dataset.say], say: inp.value }; return savePron(next, "Saved.");
+      const next = L.terms.slice(); next[+inp.dataset.say] = { ...next[+inp.dataset.say], say: inp.value }; return saveList({ terms: next }, "Saved.");
     }));
-    $$("[data-del]").forEach(b => b.onclick = attempt(() => savePron(S.prons.filter((_, i) => i !== +b.dataset.del), "Removed.")));
-    $$("[data-addsug]").forEach(b => b.onclick = attempt(() => { const [term, say] = b.dataset.addsug.split("|"); return savePron([...S.prons, { term, say }], `Added ${term}.`); }));
-    $$("[data-hear]").forEach(b => b.onclick = attempt(() => speak(S.prons[+b.dataset.hear].term, b)));
+    $$("[data-del]").forEach(b => b.onclick = attempt(() => saveList({ terms: L.terms.filter((_, i) => i !== +b.dataset.del) }, "Removed.")));
+    $("#acrBox").onchange = attempt(e => saveList({ acronyms: e.target.value.split(",") }, "Acronyms saved."));
+    $$("[data-addsug]").forEach(b => b.onclick = attempt(() => saveList({ acronyms: [...L.acronyms, b.dataset.addsug] }, `${b.dataset.addsug} will be spelled out.`)));
+    $$("[data-hear]").forEach(b => b.onclick = attempt(() => speak(L.terms[+b.dataset.hear].term, b)));
+    $$("[data-uselist]").forEach(c => c.onchange = attempt(async () => {
+      const id = c.dataset.uselist, next = c.checked ? [...used, id] : used.filter(x => x !== id);
+      if (S.project.done && !confirm("Lines whose spoken text changes with this will be generated again. Continue?")) { c.checked = !c.checked; return; }
+      await api("PUT", `/api/projects/${S.pid}/settings`, { pron_lists: next });
+      await reloadProject(); await renderPron($("#pronSearch")?.value || "");
+      toast(c.checked ? "List added to this project." : "List removed from this project.");
+    }));
     const sb = $("#speakBtn"); if (sb) sb.onclick = attempt(() => speak($("#testLine").value, sb, true));
   }
-  async function savePron(list, msg) {
-    S.prons = await api("PUT", "/api/pronunciations", list);
-    S.overview.pronunciations = S.prons.length;
-    renderSidebar(); await renderPron($("#pronSearch")?.value || ""); toast(msg);
+  async function saveList(change, msg) {
+    const d = await api("PUT", `/api/pronlists/${S.editList}`, change);
+    S.lists = S.lists.map(l => l.id === d.id ? d : l);
+    await refreshOverview(); if (S.project) await loadProject();
+    await renderPron($("#pronSearch")?.value || ""); toast(msg);
+  }
+  async function listMenu() {
+    const L = curList();
+    const r = await modal("Pronunciation lists", `
+      <div><label class="label">Rename ${esc(L.name)}</label><input type="text" name="rename" value="${esc(L.name)}"></div>
+      <div><label class="label">Or start a new list</label><input type="text" name="create" placeholder="e.g. Fantasy names"></div>
+      ${L.id !== "general" ? `<label class="toggle"><input type="checkbox" name="remove"><span class="sw"></span><span><span class="t">Delete ${esc(L.name)}</span><br>
+        <span class="d">Only when no project uses it.</span></span></label>` : ""}`, "Save");
+    if (!r) return;
+    if (r.remove) { await api("DELETE", `/api/pronlists/${L.id}`); S.editList = null; await loadLists(); await refreshOverview(); toast(`Deleted ${L.name}.`); return renderPron(); }
+    if (r.rename.trim() && r.rename.trim() !== L.name) await saveList({ name: r.rename }, "Renamed.");
+    if (r.create.trim()) {
+      const d = await api("POST", "/api/pronlists", { name: r.create.trim() });
+      await loadLists(); S.editList = d.id; await refreshOverview(); await renderPron();
+      toast(`Made ${d.name}. Tick it under "Lists this project uses" to use it here.`);
+    }
   }
   async function speak(text, btn, showSpoken) {
     const old = btn.innerHTML; btn.disabled = true;
     btn.innerHTML = worker().running ? "Waiting for the current paragraph…" : "Speaking…";
     try {
-      const r = await api("POST", "/api/preview", { text, voice: S.project.voice, quality: "fast" });
+      const r = await api("POST", "/api/preview", { text, voice: S.project.voice, quality: "fast", project: S.pid || "" });
       if (showSpoken) $("#testSpoken").textContent = "Read as: " + (r.headers.get("X-Spoken") || "");
       const url = URL.createObjectURL(await r.blob());
       play(url, "preview");
@@ -768,6 +831,7 @@
     $$("[data-cog]").forEach(b => b.onclick = () => cogClick(c.items[+b.dataset.cog]));
   }
   async function loadCog() {
+    if (!S.overview.cogitator) { S.cog = null; $("#cogLabel").hidden = $("#cogList").hidden = true; return; }
     const before = S.cog?.items.filter(i => i.project).length;
     S.cog = await api("GET", "/api/cogitator").catch(() => null);
     renderCog();
@@ -814,6 +878,18 @@
     Object.entries(r).forEach(([k, v]) => { if (k.startsWith("map:") && v) voice_map[k.slice(4)] = v; });
     S.cog.settings = await api("PUT", "/api/cogitator/settings", { auto_import: r.auto_import, auto_generate: r.auto_generate, voice_map });
     toast(r.auto_import ? "Saved. Finished scripts will import on their own." : "Saved.");
+  });
+
+  $("#openSettings").onclick = attempt(async () => {
+    const on = S.overview.cogitator;
+    const r = await modal("Settings", `
+      <div class="card-sub">Connections to other apps on this Mac. F5 Studio works on its own without any of them.</div>
+      <label class="toggle"><input type="checkbox" name="cogitator" ${on ? "checked" : ""}><span class="sw"></span><span><span class="t">The Cogitator</span><br>
+        <span class="d">Shows tutor scripts from the study app (~/projects/study/scripts) in the sidebar, ready to import.</span></span></label>`, "Save");
+    if (!r || r.cogitator === on) return;
+    await api("PUT", "/api/cogitator/settings", { enabled: r.cogitator });
+    await refreshOverview(); await loadCog(); go(S.step);
+    toast(r.cogitator ? "The Cogitator is connected." : "The Cogitator is hidden. Projects imported from it stay.");
   });
 
   /* ---------- routing, polling ---------- */
@@ -881,9 +957,9 @@
     const vs = S.overview.voices;
     if (!vs.length) { toast("Add a voice first."); go("voice"); return; }
     const r = await modal("New project", `
-      <div><label class="label">Name</label><input type="text" name="title" required placeholder="e.g. Evidence · Part 1"></div>
+      <div><label class="label">Name</label><input type="text" name="title" required placeholder="e.g. Chapter 1, or Vi & Saki · Banter"></div>
       <div><label class="label">Voice</label><select name="voice">${vs.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join("")}</select></div>
-      <div><label class="label">Persona (optional)</label><input type="text" name="persona" placeholder="e.g. Shadowheart (dom)"></div>`, "Create");
+      <div><label class="label">Narrator or character (optional)</label><input type="text" name="persona" placeholder="e.g. Narrator"></div>`, "Create");
     if (!r || !r.title.trim()) return;
     const p = await api("POST", "/api/projects", r);
     await loadOverview(); await selectProject(p.id); go("script");
@@ -898,6 +974,6 @@
     renderSidebar(); go(S.step);
     S.lastExportWhen = worker().last_export?.when ?? null;
     if (worker().running) poll();
-    loadCog(); setInterval(loadCog, 10000);
+    loadCog(); setInterval(() => { if (S.overview.cogitator) loadCog(); }, 10000);
   })();
 })();

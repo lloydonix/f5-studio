@@ -1,6 +1,6 @@
 # F5 Studio
 
-A local, offline app for turning study scripts into long-form audio with F5-TTS. Open it from the
+A local, offline app for turning text (book excerpts, dialogue, scripts) into long-form audio with F5-TTS. Open it from the
 Dock (`~/Applications/F5 Studio.app`); quitting it stops everything.
 
 ## How it fits together
@@ -11,9 +11,9 @@ Dock (`~/Applications/F5 Studio.app`); quitting it stops everything.
 - `studio/` — the backend (FastAPI, in `~/projects/f5-tts/.venv`):
   - `server.py` API + UI, `store.py` files on disk, `textprep.py` script → spoken paragraphs,
     `engine.py` F5 model + generation queue, `export.py` merge → `~/projects/f5-tts/exports/<project>/`, `voices.py` clips,
-    `inbox.py` the Cogitator bridge (below), `parts.py` optional splitting of long projects into parts
+    `inbox.py` the optional Cogitator bridge (below), `parts.py` optional splitting of long projects into parts
     (planned once from the generation-time estimate, by whole sections; each part can auto-export when done).
-- **The Cogitator bridge** (`studio/inbox.py`): the sidebar's "From the Cogitator" list shows the
+- **The Cogitator bridge** (`studio/inbox.py`, off unless switched on under Settings): the sidebar's "From the Cogitator" list shows the
   tutor scripts that the Scriptorium in `~/projects/study` saves to `~/projects/study/scripts/`. A script counts as
   ready when the Scriptorium's job (`127.0.0.1:8779/scriptorium/api/job`) is no longer writing it and
   it ends with its sign-off. Import makes it a project, or updates the project made from it before;
@@ -30,7 +30,7 @@ Dock (`~/Applications/F5 Studio.app`); quitting it stops everything.
   paragraph; `clips/index.json` maps each paragraph's text to its clip, so editing a line only
   redoes that line).
 - `~/projects/f5-tts/studio/voices/<id>/` — `voice.json`, `clip.wav` (trimmed, 24 kHz), `original.*`.
-- `~/projects/f5-tts/studio/pronunciations.json` — the shared pronunciation list.
+- `~/projects/f5-tts/studio/pronunciations/<id>.json` — pronunciation lists (`{name, terms, acronyms}`); each project lists the ones it uses in `pron_lists`. Projects from before lists existed use `law` (the old shared `pronunciations.json`, which is kept).
 - `~/projects/f5-tts/exports/<project title>/` — exported MP3/WAV files (Show in Finder opens it).
 
 ## Notes

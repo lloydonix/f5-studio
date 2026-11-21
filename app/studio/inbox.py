@@ -1,4 +1,6 @@
-"""The Cogitator bridge: tutor scripts written by the Scriptorium (~/projects/study) come into F5 Studio.
+"""Optional Cogitator bridge: tutor scripts written by the Scriptorium (~/projects/study) come into F5 Studio.
+
+Off unless switched on in F5 Studio's settings (studio/cogitator.json "enabled").
 
 The Scriptorium saves `~/projects/study/scripts/<Voice> Tutor Script - <Subject> - Part N.txt`, appending each
 section as it's written. A script is ready once the Scriptorium's job no longer lists it as the file in
@@ -25,6 +27,7 @@ _lock = threading.Lock()
 
 def settings():
     s = store._read(SETTINGS, {}) or {}
+    s.setdefault("enabled", False)
     s.setdefault("auto_import", False)
     s.setdefault("auto_generate", False)
     s.setdefault("voice_map", {})          # Cogitator persona -> F5 voice id
@@ -33,7 +36,7 @@ def settings():
 
 def save_settings(change):
     s = settings()
-    for k in ("auto_import", "auto_generate", "voice_map"):
+    for k in ("enabled", "auto_import", "auto_generate", "voice_map"):
         if k in change:
             s[k] = change[k]
     store._write(SETTINGS, s)
@@ -69,8 +72,8 @@ def _imported():
 
 
 def scan():
-    if not SCRIPTS.is_dir():
-        return {"available": False, "folder": str(SCRIPTS), "items": [], "job": None}
+    if not settings()["enabled"] or not SCRIPTS.is_dir():
+        return {"available": False, "enabled": settings()["enabled"], "folder": str(SCRIPTS), "items": [], "job": None}
     job = _job()
     writing = job["files"][-1] if job and job.get("state") == "running" and job.get("files") else None
     stopped = job["files"][-1] if job and job.get("state") in ("failed", "cancelled") and job.get("files") else None
@@ -94,7 +97,7 @@ def scan():
             "project": proj.id if proj else None,
             "changed": bool(proj) and st.st_mtime > at + 1,
         })
-    return {"available": True, "folder": str(SCRIPTS), "items": items,
+    return {"available": True, "enabled": True, "folder": str(SCRIPTS), "items": items,
             "job": job and {k: job.get(k) for k in ("state", "done", "total", "files")}}
 
 
@@ -129,6 +132,7 @@ def import_script(name, voice_id=None, generate=False, project_id=None, replace=
                 raise ValueError("Add a voice in F5 Studio first.")
             title = f"{m['subject']} · {m['label']}" if m else f.stem
             proj = store.create_project(title, voice_id, persona)
+            proj.save_meta(pron_lists=["law", "general"])   # study scripts: law terms first
         elif voice_id and voice_id != proj.meta.get("voice"):
             proj.save_meta(voice=voice_id)
         proj.save_script(f.read_text(encoding="utf-8"))
@@ -144,7 +148,7 @@ def _auto_loop():
         time.sleep(15)
         try:
             s = settings()
-            if not s["auto_import"]:
+            if not (s["enabled"] and s["auto_import"]):
                 continue
             for it in scan()["items"]:
                 if it["state"] == "ready" and (not it["project"] or it["changed"]):

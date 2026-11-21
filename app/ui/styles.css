@@ -322,3 +322,8 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 #projectList { max-height: 38vh; overflow-y: auto; }
 #cogList { max-height: 26vh; overflow-y: auto; }
 #projectList, #cogList { scrollbar-width: thin; padding-right: 2px; }
+
+/* "Compare with the original" is a <details> card */
+details.card > summary { list-style: none; }
+details.card > summary::-webkit-details-marker { display: none; }
+details.card:not([open]) > summary { border-bottom: 0; }

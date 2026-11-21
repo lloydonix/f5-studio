@@ -42,7 +42,9 @@ def state():
     return {
         "projects": [p.summary() for p in store.projects()],
         "voices": store.voices(),
-        "pronunciations": len(store.pronunciations()),
+        "pron_lists": [{"id": d["id"], "name": d["name"], "count": len(d["terms"]) + len(d["acronyms"])}
+                       for d in store.pron_lists()],
+        "cogitator": inbox.settings()["enabled"],
         "worker": engine.WORKER.state(),
     }
 
@@ -74,7 +76,7 @@ def get_project(pid: str):
     m = p.meta
     return {
         **p.summary(sections), "script": p.script, "source": p.source, "sections": sections,
-        "pacing": m["pacing"], "quality": m["quality"], "writer": m["writer"], "origin": m.get("origin"), "exports": p.exports(), "export_dir": str(p.export_dir),
+        "pacing": m["pacing"], "quality": m["quality"], "writer": m["writer"], "origin": m.get("origin"), "pron_lists": m["pron_lists"], "exports": p.exports(), "export_dir": str(p.export_dir),
         "check": textprep.fact_check(p.source, p.script) if p.source.strip() else None,
         "split": parts.summary(p, sections, engine.WORKER.ratio),
     }
@@ -97,7 +99,7 @@ def save_source(pid: str, source: str = Body(..., embed=True)):
 @app.put("/api/projects/{pid}/settings")
 def save_settings(pid: str, body: dict = Body(...)):
     p = project_or_404(pid)
-    allowed = {k: body[k] for k in ("title", "voice", "persona", "pacing", "quality", "writer") if k in body}
+    allowed = {k: body[k] for k in ("title", "voice", "persona", "pacing", "quality", "writer", "pron_lists") if k in body}
     if "voice" in allowed:
         voice_or_404(allowed["voice"])
     p.save_meta(**allowed)
@@ -128,9 +130,10 @@ def gen_pause():
 
 
 @app.post("/api/preview")
-def preview(text: str = Body(...), voice: str = Body(...), quality: str = Body("best")):
+def preview(text: str = Body(...), voice: str = Body(...), quality: str = Body("best"), project: str = Body("")):
     v = voice_or_404(voice)
-    spoken = textprep.speak(text, store.pronunciations())
+    terms, acronyms = project_or_404(project).prons() if project else store.merged_prons(["general"])
+    spoken = textprep.speak(text, terms, acronyms)
     if not spoken:
         bad("Type something to hear.")
     return Response(engine.ENGINE.preview_wav_bytes(v, spoken, quality), media_type="audio/wav",
@@ -179,14 +182,36 @@ def reveal(path: str = Body(..., embed=True)):
 
 # ---------- pronunciations ----------
 
-@app.get("/api/pronunciations")
-def get_prons():
-    return store.pronunciations()
+@app.get("/api/pronlists")
+def get_pron_lists():
+    return store.pron_lists()
 
 
-@app.put("/api/pronunciations")
-def put_prons(rows: list = Body(...)):
-    return store.save_pronunciations(rows)
+@app.post("/api/pronlists")
+def new_pron_list(name: str = Body(..., embed=True)):
+    if not name.strip():
+        bad("Give the list a name.")
+    return store.create_pron_list(name)
+
+
+@app.put("/api/pronlists/{lid}")
+def put_pron_list(lid: str, body: dict = Body(...)):
+    try:
+        return store.save_pron_list(lid, body.get("name"), body.get("terms"), body.get("acronyms"))
+    except KeyError:
+        bad("No such list.", 404)
+
+
+@app.delete("/api/pronlists/{lid}")
+def del_pron_list(lid: str):
+    users = [p.meta.get("title", p.id) for p in store.projects() if lid in p.meta["pron_lists"]]
+    if users:
+        bad(f"Still used by {len(users)} project{'s' if len(users) > 1 else ''}: {', '.join(users[:3])}.")
+    try:
+        store.delete_pron_list(lid)
+    except KeyError:
+        bad("That list can't be deleted.", 404)
+    return {"ok": True}
 
 
 # ---------- voices ----------
