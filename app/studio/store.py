@@ -289,6 +289,19 @@ def projects():
     return sorted(out, key=lambda p: (-(p.meta.get("created") or 0), -(p.meta.get("order") or 0), p.meta.get("title", "")))
 
 
+def trash_project(pid):
+    """Move a project's folder (script, clips, settings) to the macOS Trash. Exports are left alone."""
+    p = Project(pid)
+    trash = Path.home() / ".Trash"
+    dest = trash / f"F5 Studio - {p.dir.name}"
+    n = 2
+    while dest.exists():
+        dest, n = trash / f"F5 Studio - {p.dir.name} {n}", n + 1
+    with _lock:
+        p.dir.rename(dest)
+    return dest
+
+
 def create_project(title, voice_id, persona=""):
     pid = slugify(title)
     d = PROJECTS / pid

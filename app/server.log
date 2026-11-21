@@ -42,3 +42,12 @@ ERROR:    [Errno 48] error while attempting to bind on address ('127.0.0.1', 879
 --- starting 2026-11-05 12:10:43 +0000
 
 --- starting 2026-11-21 21:55:18 +0000
+ERROR:    [Errno 48] error while attemptERROR:    [Errno 48] error while attempting to bind on address ('127.0.0.1', 8799): address already in use
+
+--- starting 2026-11-21 21:55:24 +0000
+ERROR:    [Errno 48] error while attempting to bind on address ('127.0.0.1', 8799): address already in use
+
+--- starting 2026-11-21 21:55:31 +0000
+
+--- starting 2026-11-21 21:55:38 +0000
+ERROR:    [Errno 48] error while attempting to bind on address ('127.0.0.1', 8799): address already in use

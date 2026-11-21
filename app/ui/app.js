@@ -132,6 +132,7 @@
   function renderHeader() {
     const p = S.project;
     if (!p) {
+      $("#delProject").hidden = true;
       $("#projTitle").textContent = "Welcome";
       $("#projState").className = "chip"; $("#projState").textContent = "";
       $("#projMeta").innerHTML = '<span>Create a project to get started.</span>';
@@ -139,6 +140,7 @@
     }
     const w = worker(), mine = w.running && w.current?.project === p.id, done = p.total && p.done >= p.total;
     $("#projTitle").textContent = p.title;
+    $("#delProject").hidden = false;
     const chip = $("#projState");
     chip.className = "chip " + (mine ? "chip-busy" : done ? "chip-ok" : p.total ? "chip-warn" : "");
     chip.innerHTML = mine ? '<span class="dot dot-busy"></span>Generating' : done ? "Complete" : p.done ? "Paused" : p.total ? "Not started" : "Empty";
@@ -878,6 +880,21 @@
     Object.entries(r).forEach(([k, v]) => { if (k.startsWith("map:") && v) voice_map[k.slice(4)] = v; });
     S.cog.settings = await api("PUT", "/api/cogitator/settings", { auto_import: r.auto_import, auto_generate: r.auto_generate, voice_map });
     toast(r.auto_import ? "Saved. Finished scripts will import on their own." : "Saved.");
+  });
+
+  $("#delProject").onclick = attempt(async () => {
+    const p = S.project; if (!p) return;
+    const w = worker();
+    if (w.running && w.current?.project === p.id) return toast("This project is generating right now. Pause it first, then delete it.");
+    const r = await modal("Delete project", `
+      <div>Move <b>${esc(p.title)}</b> to the Trash?</div>
+      <div class="small muted">${p.done ? `Its script and the audio for ${p.done} of ${p.total} paragraphs go with it.` : "Its script goes with it. No audio was generated yet."}
+        Exported files in ${esc(shortPath(p.export_dir))} stay. You can get the project back from the Trash until you empty it.</div>`, "Move to Trash");
+    if (!r) return;
+    await api("DELETE", `/api/projects/${p.id}`);
+    S.pid = null; S.project = null; save("pid", "");
+    await loadOverview(); await loadProject(); renderSidebar(); go(S.step);
+    toast(`Moved ${p.title} to the Trash.`);
   });
 
   $("#openSettings").onclick = attempt(async () => {

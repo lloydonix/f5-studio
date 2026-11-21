@@ -96,6 +96,15 @@ def save_source(pid: str, source: str = Body(..., embed=True)):
     return {"check": textprep.fact_check(source, p.script) if source.strip() else None}
 
 
+@app.delete("/api/projects/{pid}")
+def delete_project(pid: str):
+    project_or_404(pid)
+    if not engine.WORKER.remove(pid):
+        bad("This project is generating right now. Pause it first, then delete it.", 409)
+    dest = store.trash_project(pid)
+    return {"ok": True, "trash": str(dest)}
+
+
 @app.put("/api/projects/{pid}/settings")
 def save_settings(pid: str, body: dict = Body(...)):
     p = project_or_404(pid)

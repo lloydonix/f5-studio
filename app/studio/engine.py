@@ -85,6 +85,15 @@ class Worker:
                 self.queue.append(pid)
             self.cv.notify()
 
+    def remove(self, pid):
+        """Take a project out of the queue. False if it's generating a paragraph right now."""
+        with self.cv:
+            if self.current and self.current["project"] == pid:
+                return False
+            if pid in self.queue:
+                self.queue.remove(pid)
+            return True
+
     def pause(self):
         with self.cv:
             self.paused = True     # takes effect after the paragraph in progress
